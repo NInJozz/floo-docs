@@ -42,3 +42,6 @@ Thumbs.db
 
 # VS Code (optional)
 .vscode/
+
+# thesis.pdf
+*.pdf

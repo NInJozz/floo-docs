@@ -1,0 +1,44 @@
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# Bibliography
+*.bbl
+*.blg
+
+# Index
+*.idx
+*.ind
+*.ilg
+
+# Glossary
+*.glo
+*.gls
+*.glg
+*.glsdefs
+*.ist
+*.acn
+*.acr
+*.alg
+
+# Latexmk
+*.run.xml
+
+# Temporary
+*.nav
+*.snm
+*.vrb
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code (optional)
+.vscode/

@@ -4731,7 +4731,11 @@ Each error category is encapsulated in its own self-contained handler class. The
     \item \texttt{NodemailerErrorHandler} — handles SMTP connection and authentication errors with specific internal logging per error code.
     \item \texttt{AppErrorHandler} — handles all intentionally thrown \texttt{AppError} instances from application code.
     \item \texttt{UnexpectedErrorHandler} — a catch-all fallback whose \texttt{canHandle()} always returns \texttt{true}. It must always be the last entry in the registry.
-\end{itemize}
+    \item \texttt{CloudinaryErrorHandler} — handles Cloudinary storage service errors such as invalid file uploads, authentication failures, missing resources, and API rate limiting.
+    \item \texttt{LLMErrorHandler} — handles large language model (LLM) API errors such as quota exhaustion, rate limiting, context length violations, and invalid request parameters.
+    \item \texttt{PassportOAuthErrorHandler} — handles Passport OAuth authentication errors such as invalid or expired tokens, profile retrieval failures, and authorization denial by the user.
+    \item \texttt{RateLimitErrorHandler} — handles application rate limiting errors by detecting excessive client requests and returning an appropriate rate limit response.
+  \end{itemize}
 
 \subsubsection{The Registry}
 The \texttt{errorHandlerRegistry} is an ordered array of handler instances. The middleware iterates through it and delegates to the first handler whose \texttt{canHandle()} returns \texttt{true}. Order is 

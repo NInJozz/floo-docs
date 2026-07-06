@@ -1,0 +1,98 @@
+\section{Backend Architecture}
+\subsection{Backend Overview}
+The backend of the FLOO platform is built on a modular, multi-layered architecture using Node.js, Express.js, and TypeScript. This design enforces a strict separation of concerns, ensuring that routing, security, business logic, and execution are decoupled. When an HTTP request enters the system, it traverses a well-defined pipeline of middlewares and validators before reaching the core business logic.
+
+\subsection{Request Lifecycle and Flow}
+
+The lifecycle of a typical API request follows a strict sequential path designed to fail fast on invalid or unauthorized operations. The flow ensures that the core services and execution engine only ever process sanitized, authorized, and well-formed data. 
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%  <--- Added this
+\begin{tikzpicture}[
+  node distance=0.8cm and 2.5cm,
+  box/.style={rectangle, draw=black, fill=blue!5, thick, minimum width=4.5cm, minimum height=1cm, text centered, rounded corners, font=\small},
+  middleware/.style={rectangle, draw=black, fill=orange!10, thick, minimum width=4.5cm, minimum height=1cm, text centered, rounded corners, font=\small},
+  logic/.style={rectangle, draw=black, fill=green!10, thick, minimum width=4.5cm, minimum height=1cm, text centered, rounded corners, font=\small},
+  arrow/.style={thick, ->, >=stealth},
+  dashed_arrow/.style={thick, ->, >=stealth, dashed}
+]
+
+% Main vertical pipeline
+\node (client) [box, fill=gray!10] {Client Request};
+\node (router) [box, below=of client] {API Router (\texttt{api.routes.ts})};
+\node (rate) [middleware, below=of router] {Rate Limiter};
+\node (auth) [middleware, below=of rate] {Auth \& RBAC Middlewares};
+\node (validator) [middleware, below=of auth] {Request Validators};
+\node (controller) [box, below=of validator] {Controller};
+\node (service) [logic, below=of controller] {Service Layer};
+\node (response) [box, fill=gray!10, below=of service] {JSend Response};
+
+% Side nodes
+\node (execution) [logic, left=of service] {Execution Engine};
+\node (error) [middleware, fill=red!10, right=of validator] {Global Error Handler};
+
+% Solid arrows (main flow)
+\draw [arrow] (client) -- (router);
+\draw [arrow] (router) -- (rate);
+\draw [arrow] (rate) -- (auth);
+\draw [arrow] (auth) -- (validator);
+\draw [arrow] (validator) -- (controller);
+\draw [arrow] (controller) -- (service);
+\draw [arrow] (service) -- (response);
+\draw [arrow] (service) -- (execution) node[midway, above, font=\scriptsize] {If required};
+
+% Dashed arrows (Error handling) - routed cleanly to avoid overlapping
+\draw [dashed_arrow] (auth.east) -| ([xshift=-0.5cm]error.north);
+\draw [dashed_arrow] (validator.east) -- (error.west) node[midway, above, font=\scriptsize] {On failure};
+\draw [dashed_arrow] (controller.east) -| ([xshift=-0.5cm]error.south);
+\draw [dashed_arrow] (service.east) -| ([xshift=0.5cm]error.south);
+
+\end{tikzpicture}
+} % <--- Closed the resizebox here
+\caption{High-level lifecycle of an incoming API request}
+\label{fig:request-flow}
+\end{figure}
+
+\subsection{Backend System Layers}
+
+The directory structure directly reflects the architectural boundaries of the application. Each layer has a single, distinct responsibility.
+
+\subsubsection{Routes}
+The routing layer is responsible for mapping incoming HTTP endpoints to their corresponding controller handlers. It acts as the entry point for the API hierarchy. Routes are logically grouped by entity (e.g., users, projects, workflows, nodes) and define the specific middleware chain required for each endpoint. 
+
+By keeping the routing layer declarative, it provides a clear, high-level map of the entire API surface without bleeding into implementation details.
+
+\subsubsection{Middlewares}
+Middlewares act as the gatekeepers of the application. They intercept incoming requests to enforce systemic rules before the request can reach the business logic. This layer handles security concerns such as JSON Web Token (JWT) verification, role-based access control (RBAC), and email verification checks.
+
+Additionally, middlewares manage traffic control via strict rate limiters, standardize outgoing success responses using the JSend format, and intercept exceptions through a centralized, registry-based error handling mechanism.
+
+\subsubsection{Validators}
+Request validation is abstracted into its own layer using \texttt{express-validator}. Before a request payload is processed, it is checked against strict schemas to ensure data integrity and type safety.
+
+This layer ensures that bad payloads, missing parameters, or malformed data are rejected immediately with a \texttt{422 Unprocessable Entity} response. This "fail-fast" approach guarantees that the underlying controllers and services do not need to perform redundant sanity checks on incoming data.
+
+\subsubsection{Controllers}
+Controllers serve strictly as orchestrators between the HTTP transport layer and the business logic. A controller's only responsibility is to extract data from the incoming request (headers, body, params, query), pass that data to the appropriate service, and return the service's output back to the client.
+
+Controllers are intentionally kept thin; they do not contain complex business rules or database queries, adhering strictly to the Single Responsibility Principle.
+
+\subsubsection{Services}
+The service layer forms the heart of the backend, encapsulating the core business logic of the FLOO platform. All heavy lifting—such as workflow graph construction, file processing with Cloudinary, communicating with the LLM via Groq, and interacting with the database—happens here.
+
+By isolating business logic into services, the code becomes highly reusable and independently testable. For example, the execution engine can invoke a service method directly without needing to mock an HTTP request.
+
+\subsubsection{Strategies}
+The strategies layer encapsulates interchangeable authentication algorithms and behaviors, specifically leveraging Passport.js for OAuth 2.0 integrations. 
+
+This directory contains the logic required to negotiate with external identity providers (such as Google, GitHub, and Discord) and third-party APIs like Google Sheets. Separating these into strategies allows the platform to easily scale the number of supported integrations without cluttering the core authentication flow.
+
+\subsubsection{Utils}
+The utils directory houses pure, stateless helper functions that are shared across multiple layers of the application. These include cryptographic operations like hashing passwords with \texttt{bcryptjs}, generating JWTs, and creating one-time passwords (OTPs) for email verification. 
+
+Because these functions are pure and self-contained, they are highly reliable and prevent code duplication throughout the codebase.
+
+\subsubsection{Types}
+TypeScript interfaces and type definitions form the foundational contract of the application. The types layer defines the exact shape of data structures used across the system, such as augmented Express Request objects (\texttt{AuthRequest}) or standardized OAuth profiles. 
+
+This layer ensures strict compile-time safety, allowing the compiler to catch structural mismatches between the frontend payloads, the internal API representation, and the execution engine.

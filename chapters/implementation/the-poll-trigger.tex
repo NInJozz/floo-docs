@@ -1,0 +1,78 @@
+\section{The Poll Trigger}
+The Poll Trigger is designed to monitor external data sources by periodically checking for updates. Unlike event-driven triggers such as webhooks, which rely on external systems to push events, the poll trigger actively requests data at fixed intervals. This makes it particularly useful when integrating with systems that do not support real-time notifications.
+
+The trigger operates by executing a polling loop that runs at a configurable interval. At each iteration, it queries the target resource and determines whether new data is available. If a change is detected, the trigger fires and initiates a new workflow execution.
+
+\subsection{Poll Node Structure}
+
+The Poll Trigger is implemented as a specialized node class named \texttt{PollNode}, which extends the base \texttt{Node} abstraction. It is marked as a trigger node using the \texttt{triggerNode: true} flag within its static description, allowing the workflow engine to treat it as an entry point.
+
+The node metadata is defined using the \texttt{INodeDescription} interface, ensuring consistency with other node types in the system. 
+
+\subsection{Configuration Parameters}
+
+The Poll Node exposes several parameters that allow users to configure how the polling process behaves. These parameters are defined declaratively within the node description and are rendered dynamically in the user interface.
+
+\begin{itemize}
+    \item \textbf{Service}: Specifies the external service to be monitored (e.g., Gmail, Github ...).
+    \item \textbf{Email}: The account used to access the service.
+    \item \textbf{App Password}: Authentication credential required for secure access.
+    \item \textbf{Interval}: Defines the polling frequency in milliseconds (default: 300000 ms, i.e., 5 minutes).
+    \item \textbf{From Email (Optional)}: Filters incoming data based on sender address.
+    \item \textbf{Subject Contains (Optional)}: Filters messages based on subject keywords.
+\end{itemize}
+
+This design allows flexible filtering of incoming data, reducing unnecessary workflow executions.
+
+\subsection{Separation of Responsibilities}
+
+Although the \texttt{PollNode} defines the configuration and identity of the trigger, it does not implement the actual polling logic. Instead, the execution responsibility is delegated to a separate component within the trigger system (e.g., \texttt{PollSource}), which implements the EventSource interface.
+
+This separation follows a clean architectural pattern:
+
+\begin{itemize}
+    \item \textbf{PollNode}: Defines configuration and integrates with the workflow graph.
+    \item \textbf{PollSource}: Handles polling logic, scheduling, and event detection.
+\end{itemize}
+
+
+\subsection{Polling Logic and Execution Flow}
+
+The actual polling mechanism is implemented in the trigger system (via \texttt{PollSource}). When the workflow is deployed:
+
+\begin{enumerate}
+    \item The workflow engine detects that the node is a trigger node of type \texttt{poll}.
+    \item It initializes the corresponding \texttt{PollSource}.
+    \item The \texttt{start()} method is invoked, which:
+    \begin{itemize}
+        \item Creates a periodic loop using the configured interval.
+        \item Connects to the specified external service.
+        \item Retrieves new data (e.g., emails).
+        \item Applies filtering conditions (\texttt{fromEmail}, \texttt{subjectContains}).
+    \end{itemize}
+    \item If new matching data is detected:
+    \begin{itemize}
+        \item A new job is enqueued using BullMQ.
+        \item The workflow execution begins from this trigger node.
+    \end{itemize}
+\end{enumerate}
+
+When the workflow is stopped, the \texttt{stop()} method is called to terminate the polling loop and release any associated resources.
+
+\subsection{Extensibility Considerations}
+
+The Poll Node is designed to be easily extended. Additional services (e.g., GitHub, Slack) can be supported by enhancing the polling logic in \texttt{PollSource}, without requiring changes to the node structure itself.
+
+Future improvements may include service-specific validation rules, such as validating token formats depending on the selected service.
+
+\subsection{Design Evaluation}
+
+This implementation demonstrates a clear separation between configuration, execution, and event handling. Such a design provides several advantages:
+
+\begin{itemize}
+    \item Improved maintainability through separation of concerns.
+    \item Independent scaling of trigger execution.
+    \item Ease of adding new trigger types or services.
+    \item Lightweight and declarative node definitions.
+\end{itemize}
+

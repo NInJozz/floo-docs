@@ -1,0 +1,57 @@
+\section{Trigger Nodes Mechanism}
+
+\subsection{Overview}
+In a workflow automation platform, every workflow must have an entry point — something that decides when execution begins. This role is fulfilled by trigger nodes. A trigger node is a specialized node that listens for a specific event or condition and, when that condition is met, fires the rest of the workflow graph for execution.
+Unlike regular action nodes that simply process inputs and pass outputs downstream, trigger nodes are always-on components that run persistently as long as a workflow is deployed. Each trigger type reacts to a different source of events. The platform supports the following trigger types:
+\begin{itemize}
+  \item \textbf{Cron} --- fires repeatedly on a fixed time interval, starting from a configurable date.
+  \item \textbf{Poll} --- periodically checks an external source for new data.
+  \item \textbf{Webhook} --- waits for an incoming HTTP request before firing.
+  \item \textbf{Manual} --- fires immediately on demand when a user triggers execution directly.
+\end{itemize}
+
+The trigger mechanism is built around three key concerns: starting triggers when a workflow is deployed, reliably passing execution down the workflow graph when a trigger fires, and cleanly stopping all triggers when a workflow is stopped or the server shuts down.
+
+\subsection{Core Abstractions}
+\subsubsection{The EventSource Interface}
+All trigger types implement the \texttt{EventSource} interface, which defines a minimal two-method contract:
+\begin{lstlisting}
+// eventSource.ts
+import { Job } from 'bullmq';
+ 
+export interface EventSource {
+  start(body: Record<string, unknown>): Promise<Job>;
+  stop(): Promise<void>;
+}
+\end{lstlisting}
+
+This interface was intentionally kept minimal. The \texttt{start()} method receives the node configuration and returns a BullMQ Job handle, while \texttt{stop()} is responsible for cleanly cancelling whatever mechanism the trigger started. Any new trigger type only needs to implement these two methods, making the system open to extension without modifying existing code.
+ 
+Enforcing the same \texttt{start}/\texttt{stop} contract across all trigger types means the workflow runner can manage cron and poll triggers through a single loop, without any conditional branching based on type. Adding a new trigger type in the future requires no changes to the runner --- only a new class implementing \texttt{EventSource}.
+
+\subsubsection{The Node Base Class}
+Trigger nodes are still Node subclasses, following the same abstract base class as all other node types in the system. What distinguishes a trigger node is the \texttt{triggerNode: true} flag in its static description object, along with a type of 'cron', 'poll', etc.
+
+\begin{lstlisting}
+// nodeBase.ts (excerpt)
+export interface INodeDescription {
+  name: string;
+  displayName: string;
+  type: 'cron' | 'curl' | 'webhook' | 'generic' | 'poll';
+  category: 'ai' | 'action-in-app' | 'data-transformation' | 'core' | 'flow-control';
+  inputs: string[];
+  outputs: string[];
+  credentials?: string[];
+  parameters?: any[];
+  triggerNode?: boolean;   // marks this node as a trigger
+}
+ 
+export abstract class Node {
+  static description: INodeDescription;
+  abstract execute(inputs: any): Promise<any>;
+  poll?(): Promise<any>;
+  webhook?(request: any): Promise<any>;
+}
+\end{lstlisting}
+
+The \texttt{execute()} method is abstract and must be implemented by every node, including trigger nodes. For trigger nodes, this method represents what happens when the trigger actually fires — for a cron node it simply returns a confirmation string, since its real work is handled by the scheduler.

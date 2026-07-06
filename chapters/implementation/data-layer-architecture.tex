@@ -1,0 +1,208 @@
+\section{Data Layer Architecture}
+
+\subsection{Database Requirements}
+The FLOO platform requires a robust, relational data storage layer capable of supporting multi-tenant isolation, complex configuration storage, and strict security compliance. The primary storage needs encompass:
+\begin{itemize}
+    \item \textbf{User and Identity Management:} Tracking local user profiles, multi-provider OAuth identities, and RBAC roles to ensure secure, isolated workspaces.
+    \item \textbf{Project and Workflow Configurations:} Storing dynamic, graph-based automation logic and tracking deployment states.
+    \item \textbf{Execution Analytics:} Persisting detailed logs of workflow runs, statuses, and generated outputs (such as Cloudinary asset links) for debugging and system analytics.
+    \item \textbf{Secure Credential Management:} Safely storing third-party integration secrets (e.g., API keys, OAuth tokens) utilizing an encrypted, dynamically generated structure.
+\end{itemize}
+
+\textbf{Key Drivers:} Relational integrity is paramount due to the highly interconnected nature of the platform. For example, a User owns Projects, which trigger Executions, which in turn generate NodeOutputs. Transactional safety is explicitly required for operations like cascading account deletions, ensuring that scrubbing a user removes all associated relational assets without creating orphaned records. Prisma was selected as the ORM to enforce these strict foreign key constraints while providing end-to-end type safety with the TypeScript backend.
+
+\subsection{Conceptual Design (ERD)}
+The Conceptual Entity Relationship Diagram (CERD) outlines the high-level business entities and their interactions.
+
+%\begin{figure}[H]
+%    \centering
+ %   \includegraphics[width=\textwidth]{CERD.drawio.jpg}
+  %  \caption{Conceptual Entity Relationship Diagram (CERD) for the FLOO platform \href{https://drive.google.com/file/d/1w0RLbndet0nz7lhRF8SNmPFbpWwuH5Ox/view}{[Source]}}
+ %   \label{fig:cerd}
+%\end{figure}
+
+\subsubsection{Core Entity Relationships}
+The conceptual model is heavily centered around the \texttt{User} entity, enforcing a strict ownership hierarchy:
+\begin{itemize}
+    \item \textbf{Users to Projects (1:N):} A single user can create and manage multiple automation projects. All workflow executions, chat histories, and node interactions branch off this fundamental relationship.
+    \item \textbf{Projects to Executions (1:N):} Every time a workflow is triggered, an execution record is generated to track its lifecycle (e.g., NEW, RUNNING, SUCCESS, ERROR).
+    \item \textbf{Nodes to Files (1:N):} External files are represented conceptually as inputs and outputs bound to specific execution instances and nodes, tracking cloud storage references.
+\end{itemize}
+
+\subsubsection{The Dynamic Credential Architecture}
+A major architectural redesign was implemented in the credentials subsystem to provide a deep, highly flexible solution that seamlessly bridges backend storage with dynamic frontend UI rendering. 
+
+Instead of hardcoding specific integration tokens into a single table, the system abstracts credentials into a definition-and-value pattern:
+\begin{itemize}
+    \item \textbf{Definition Phase:} Admins define a \texttt{CredentialType} (e.g., "Google Sheets" or "SMTP"). This type has a 1:N relationship with \texttt{CredentialParameterType}, which outlines the specific fields required (e.g., "API Key", "Client Secret").
+    \item \textbf{UI Control Integration:} The \texttt{CredentialParameterType} includes metadata fields like \texttt{maxChar} and \texttt{isSensitive}. This design allows the frontend UI to automatically generate forms with appropriate validation and hidden password inputs without hardcoding frontend logic for every new integration type.
+    \item \textbf{Value Phase:} When a user connects an integration, the system generates a \texttt{UserCredentialSet} linking to the \texttt{CredentialType}. The actual encrypted secrets are stored in \texttt{UserCredentialValue} records, creating a normalized mapping back to the expected parameters.
+\end{itemize}
+
+\subsection{Mapping to Relational Model (Logical/Physical Design)}
+The logical design translates the conceptual entities into concrete database tables, explicitly defining keys, data types, and constraints utilizing the Prisma schema.
+
+%\begin{figure}[H]
+ %   \centering
+
+ %   \includegraphics[width=\textwidth]{PERD.drawio.jpg}
+%    \caption{Physical Entity Relationship Diagram (PERD) mapped to PostgreSQL}
+%    \label{fig:perd}
+%\end{figure}
+
+\subsubsection{Primary and Foreign Key Strategy}
+\begin{itemize}
+    \item \textbf{Universal UUIDs:} All primary keys (PK) across the platform utilize auto-generated UUIDs (e.g., \texttt{@id @default(uuid())}). This strategy prevents resource enumeration attacks and ensures global uniqueness, particularly useful when merging distributed data.
+    \item \textbf{Composite Constraints:} Certain tables utilize composite keys to enforce logical uniqueness. For example, \texttt{AuthIdentityProvider} uses \texttt{@@id([provider, providerId])} to ensure a user cannot link the same third-party account twice. Similarly, \texttt{UserCredentialValue} enforces \texttt{@@unique([setId, paramId])} to guarantee only one value exists per parameter in a given credential set.
+    \item \textbf{Aggressive Cascading Deletions:} To maintain strict data hygiene and comply with PII scrubbing requirements, foreign keys aggressively employ \texttt{onDelete: Cascade}. Deleting a User cascades down to erase their Projects, which in turn wipes Executions, Node Inputs, and Chat Messages instantly at the database level.
+\end{itemize}
+
+\subsubsection{Junction and Mapping Tables}
+The database features specific mapping tables to resolve complex relationships. \texttt{UserCredentialValue} serves as the critical junction between a user's \texttt{UserCredentialSet} and the system's \texttt{CredentialParameterType}. This normalized approach ensures that if a parameter requirement changes at the system level, the relationship to the user's stored values remains structurally intact.
+
+\subsubsection{Intentional Denormalization (JSON Workflows)}
+While the database is heavily normalized, a deliberate exception was made for workflow graph configurations. Rather than splitting workflow nodes, edges, and positions into dozens of relational tables, the entire graph is serialized and stored in a \texttt{Json} column within the \texttt{Project} table (\texttt{workflow Json?}). 
+
+This is a strategic design choice: workflow graphs are exclusively read and updated as a single atomic unit by the React Flow frontend. Normalizing the graph would require complex, expensive recursive SQL joins upon every canvas load. Utilizing a JSON column provides the necessary schema flexibility for varied node data while preserving high-performance read/write operations.
+
+\subsection{Physical Database Design \& Implementation}
+
+The physical database layer is implemented using PostgreSQL hosted on Supabase. We utilize Prisma ORM to enforce end-to-end type safety across the application. The schema is maintained through declarative migrations, ensuring that the database state is always synchronized with our TypeScript interfaces. Sensitive data, such as integration credentials, is stored using standard text fields, with robust encryption and decryption logic handled strictly at the Service Layer before ever reaching the persistence layer.
+
+\subsubsection{Database Engine: PostgreSQL (via Supabase)}
+PostgreSQL was selected as the underlying engine for its strict adherence to ACID compliance, robust support for relational integrity, and advanced JSON processing capabilities. Hosting via Supabase provides managed scaling, automated backups, and connection pooling, ensuring the database can handle high-frequency reads and writes typical of an automated workflow engine.
+
+\subsubsection{ORM Layer (Prisma)}
+Prisma acts as the bridge between the Node.js backend and the PostgreSQL database. Rather than writing raw SQL queries, the application relies on the generated Prisma Client.
+\begin{itemize}
+    \item \textbf{Type Safety:} The `schema.prisma` file serves as the single source of truth. Changes to the schema automatically regenerate TypeScript definitions, ensuring that any mismatched queries, missing fields, or incorrect data types are caught at compile-time rather than throwing unexpected runtime errors.
+    \item \textbf{JSON Workflows:} Prisma natively supports PostgreSQL's `JSONB` data type, allowing the `Project` table to store complex, nested React Flow graphs in the `workflow` column without sacrificing query performance or requiring excessive normalization.
+\end{itemize}
+
+\subsubsection{Migration Management}
+Database schema evolution is managed via Prisma Migrations. Instead of executing manual SQL scripts directly against production, developers modify the declarative Prisma schema. The migration engine then generates deterministic SQL differential scripts. This approach ensures that schema changes are strictly version-controlled, reproducible across local, staging, and production environments, and seamlessly integrated into the CI/CD pipeline.
+
+\subsubsection{Technical Constraints}
+To guarantee data integrity and query performance at scale, several constraints are baked directly into the physical schema:
+
+\paragraph{Indexes}
+Indexes are strategically applied to fields that are frequently used in `WHERE` clauses, sorting operations, or foreign key lookups to prevent full table scans:
+\begin{itemize}
+    \item \textbf{Foreign Key Lookups:} Indexes on `userId` within the `Project` and `NodeInput` tables drastically reduce query times when an authenticated user requests their dashboard.
+    \item \textbf{Lookup Optimization:} The `email` column in the `User` table is indexed to optimize the high-frequency login and registration authentication flows.
+    \item \textbf{Composite Indexes:} High-traffic logging tables utilize composite indexes, such as `@@index([executionId, nodeId])` on `NodeOutput`, enabling rapid retrieval of execution assets for the frontend analytics UI.
+\end{itemize}
+
+\paragraph{Constraints}
+\begin{itemize}
+    \item \textbf{Primary Keys:} All entities utilize UUIDs (`@id @default(uuid())`) as primary keys. This prevents resource enumeration attacks (e.g., guessing a user's ID) and facilitates distributed data merging.
+    \item \textbf{Unique Constraints:} `@@unique` constraints enforce strict data uniqueness, such as ensuring no two users share an `email`, and no two files share a Cloudinary `publicId`.
+    \item \textbf{Composite Uniques:} The `UserCredentialValue` table employs `@@unique([setId, paramId])` to guarantee that a specific credential set contains exactly one value per required parameter, preventing duplicate secret injection.
+\end{itemize}
+
+\paragraph{Cascade Rules \& Account Deletion}
+Foreign key cascading is aggressively utilized to enforce data hygiene and simplify backend logic. In the schema, relations defining ownership are marked with `onDelete: Cascade`. 
+
+This is highly crucial for the platform's \textbf{Account Deletion Flow}. When a user self-deletes (or is purged by an admin), the database engine natively and atomically destroys all linked `Project` rows. The cascade continues downward, automatically erasing all `Execution` logs, `NodeInput` assets, and `UserCredentialSet` secrets. This guarantees compliance with PII scrubbing requirements without requiring the application service layer to manually fetch and delete thousands of related rows, effectively preventing orphaned data.
+
+% ---------------------------------------------------------
+
+\subsection{Data Dictionary}
+The following tables detail the physical layout, constraints, and definitions of the core entities in the FLOO system.
+
+\subsubsection{User Table}
+Serves as the root entity for identity, access control, and ownership.
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{Column Name} & \textbf{Type} & \textbf{Constraints} & \textbf{Description} \\
+\hline
+\texttt{id} & UUID & PK & Unique identifier for the user. \\
+\hline
+\texttt{email} & VARCHAR & Unique, Index & The user's primary email address for authentication. \\
+\hline
+\texttt{password} & VARCHAR & Nullable & Bcrypt-hashed local password. Null if using strictly OAuth. \\
+\hline
+\texttt{isVerified} & BOOLEAN & Default: false & Gates access to execution features until email is confirmed. \\
+\hline
+\texttt{role} & ENUM & Default: USER & Defines RBAC privileges (USER or ADMIN). \\
+\hline
+\end{tabularx}
+\caption{Data Dictionary: User Table}
+\label{tab:dict-user}
+\end{table}
+
+\subsubsection{Project Table}
+Stores the configuration and state of the user's workflow automations.
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{Column Name} & \textbf{Type} & \textbf{Constraints} & \textbf{Description} \\
+\hline
+\texttt{id} & UUID & PK & Unique identifier for the project. \\
+\hline
+\texttt{userId} & UUID & FK, Cascade & References \texttt{User.id}. Defines ownership. \\
+\hline
+\texttt{name} & VARCHAR & Not Null & Human-readable name of the automation. \\
+\hline
+\texttt{workflow} & JSONB & Nullable & Serialized React Flow graph containing node and edge definitions. \\
+\hline
+\texttt{deployed} & BOOLEAN & Default: false & Tracks whether the project is actively running trigger nodes. \\
+\hline
+\end{tabularx}
+\caption{Data Dictionary: Project Table}
+\label{tab:dict-project}
+\end{table}
+
+\subsubsection{UserCredentialSet Table}
+Acts as the parent entity for a group of encrypted third-party integration secrets.
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{Column Name} & \textbf{Type} & \textbf{Constraints} & \textbf{Description} \\
+\hline
+\texttt{id} & UUID & PK & Unique identifier for the credential set. \\
+\hline
+\texttt{userId} & UUID & FK, Cascade & References \texttt{User.id}. Determines who can use these credentials. \\
+\hline
+\texttt{typeId} & UUID & FK, Cascade & References \texttt{CredentialType.id} (e.g., Google Sheets, SMTP). \\
+\hline
+\texttt{label} & VARCHAR & Not Null & User-defined alias for the credentials (e.g., "My Work Gmail"). \\
+\hline
+\end{tabularx}
+\caption{Data Dictionary: UserCredentialSet Table}
+\label{tab:dict-credentialset}
+\end{table}
+
+\subsubsection{Execution Table}
+Persists the lifecycle state and telemetry data for individual workflow runs.
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\textbf{Column Name} & \textbf{Type} & \textbf{Constraints} & \textbf{Description} \\
+\hline
+\texttt{id} & UUID & PK & Unique tracking identifier for the job. \\
+\hline
+\texttt{projectId} & UUID & FK, Cascade & References \texttt{Project.id}. The workflow that was triggered. \\
+\hline
+\texttt{status} & ENUM & Default: NEW & Tracks the current state (NEW, RUNNING, SUCCESS, ERROR). \\
+\hline
+\texttt{error} & TEXT & Nullable & Stores execution stack traces or API failure messages if the run crashed. \\
+\hline
+\texttt{startedAt} & TIMESTAMP & Nullable & The exact time the execution engine picked up the job. \\
+\hline
+\end{tabularx}
+\caption{Data Dictionary: Execution Table}
+\label{tab:dict-execution}
+\end{table}
+
+
+

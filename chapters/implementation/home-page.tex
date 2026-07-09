@@ -1,7 +1,9 @@
-\section{Landing Page Implementation}
+\section{Frontend Implementation}
+
+\subsection{Landing Page Implementation}
 The landing page serves as the primary entry point for the platform, separated into distinct, self-contained functional React components integrated within the main layout container.
 
-\subsection{HomePage Layout and Global Styling}
+\subsubsection{HomePage Layout and Global Styling}
 
 \textbf{Purpose:} Acts as the root orchestrator for the landing page, aggregating all functional sections sequentially and injecting the global design tokens.
 
@@ -17,7 +19,7 @@ The landing page serves as the primary entry point for the platform, separated i
     \item Standardizes shared UI elements—such as primary gradient buttons (\texttt{.btn-primary-floo}), section eyebrow tags (\texttt{.section-tag}), and \texttt{Audiowide} typography—to prevent code duplication across child components.
 \end{itemize}
 
-\subsection{Shared Content Configuration}
+\subsubsection{Shared Content Configuration}
 
 \textbf{Purpose:} Centralizes all textual content and static data arrays used across the landing page to ensure maintainability and strict separation of presentation logic from copy.
 
@@ -32,7 +34,7 @@ The landing page serves as the primary entry point for the platform, separated i
     \item Maps dynamic keys (such as service icon identifiers) within data arrays, keeping the rendering files clean and focused solely on UI logic.
 \end{itemize}
 
-\subsection{HomeNavbar Component}
+\subsubsection{HomeNavbar Component}
 
 \textbf{Purpose:} Provides site-wide navigation, handles user authentication state rendering, and toggles the global light/dark theme.
 
@@ -47,7 +49,7 @@ The landing page serves as the primary entry point for the platform, separated i
     \item Implements a sticky, glassmorphic layout that responds dynamically to the vertical scroll state.
 \end{itemize}
 
-\subsection{HomeHero Component}
+\subsubsection{HomeHero Component}
 
 \textbf{Purpose:} Establishes the initial user context using typography reveals and physics-driven, interactive background elements.
 
@@ -64,9 +66,10 @@ The landing page serves as the primary entry point for the platform, separated i
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/home-page/home-hero-image.png}
+    \caption{Home page hero section.}
 \end{figure}
 
-\subsection{HomeAbout Component}
+\subsubsection{HomeAbout Component}
 
 \textbf{Purpose:} Introduces the platform's value proposition utilizing a responsive two-column grid and dynamic, scroll-driven parallax effects.
 
@@ -86,9 +89,10 @@ The landing page serves as the primary entry point for the platform, separated i
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/home-page/home-about-image.png}
+    \caption{Home page about section.}
 \end{figure}
 
-\subsection{HomeServices Component}
+\subsubsection{HomeServices Component}
 
 \textbf{Purpose:} Presents the platform's core features via interactive, kinematic 3D tilt cards.
 
@@ -105,9 +109,10 @@ The landing page serves as the primary entry point for the platform, separated i
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/home-page/home-services-image.png}
+    \caption{Home page services section.}
 \end{figure}
 
-\subsection{HowItWorks Component}
+\subsubsection{HowItWorks Component}
 
 \textbf{Purpose:} Displays a product demonstration video with custom-built, interactive playback controls and scroll-triggered entrance animations.
 
@@ -126,9 +131,10 @@ The landing page serves as the primary entry point for the platform, separated i
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/home-page/home-howitworks-image.png}
+    \caption{Home page HowItWorks section.}
 \end{figure}
 
-\subsection{HomeMeetUs Component}
+\subsubsection{HomeMeetUs Component}
 
 \textbf{Purpose:} Displays a responsive, infinite-looping carousel to showcase the development team members.
 
@@ -146,9 +152,10 @@ The landing page serves as the primary entry point for the platform, separated i
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/home-page/home-meetus-image.png}
+    \caption{Home page meetus section.}
 \end{figure}
 
-\subsection{HomeFooter Component}
+\subsubsection{HomeFooter Component}
 
 \textbf{Purpose:} Encapsulates site navigation links and features a continuous, linear typography marquee.
 
@@ -165,4 +172,5 @@ The landing page serves as the primary entry point for the platform, separated i
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/home-page/home-footer-image.png}
+    \caption{Home page footer section.}
 \end{figure}

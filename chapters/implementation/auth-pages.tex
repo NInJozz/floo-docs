@@ -1,7 +1,7 @@
-\section{Authentication Pages Implementation}
+\subsection{Authentication Pages Implementation}
 The authentication architecture provides secure user onboarding, identity verification, and session persistence, abstracted into modular React components integrated with global context and backend authentication routines.
 
-\subsection{Main Register Page}
+\subsubsection{Main Register Page}
 
 \textbf{Purpose:} Displays the registration portal where new users can create an account. It also processes incoming location state to render success toast notifications if a user was redirected from another flow with an active message.
 
@@ -19,13 +19,15 @@ The authentication architecture provides secure user onboarding, identity verifi
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-signup1-image.png}
+    \caption{Authentication signup image}
 \end{figure}
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-signup2-image.png}
+    \caption{Authentication signup image error}
 \end{figure}
 
-\subsection{RegisterForm Component}
+\subsubsection{RegisterForm Component}
 
 \textbf{Purpose:} Handles new user registration by collecting credentials (first name, last name, email, and password) and submitting them to the API. Upon successful resolution, it populates global state, local storage, and client-side cookies before passing the user to the verification pipeline.
 
@@ -46,7 +48,7 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item Gracefully catches system rejections and errors via \texttt{react-toastify}, converting verbose server exceptions into readable text utilizing an isolated \texttt{apiErrorMessage} utility function.
 \end{itemize}
 
-\subsection{Main VerifyEmail Page}
+\subsubsection{Main VerifyEmail Page}
 
 \textbf{Purpose:} Renders the verification layout, acting as a security gateway where recently registered users must provide the valid 6-digit confirmation token delivered to their inbox.
 
@@ -64,9 +66,10 @@ The authentication architecture provides secure user onboarding, identity verifi
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-verify-image.png}
+    \caption{Authentication verify image}
 \end{figure}
 
-\subsection{VerifyEmailForm Component}
+\subsubsection{VerifyEmailForm Component}
 
 \textbf{Purpose:} Captures user input for the 6-digit email confirmation code, transmits it to the backend for verification, and alters the user's workflow trajectory based on their entry point context.
 
@@ -84,14 +87,15 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item Relies on isolated \texttt{react-toastify} context blocks to present inline confirmation alerts or format server execution rejections.
 \end{itemize}
 
-\subsection{Verification Email}
+\subsubsection{Verification Email}
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-verifycode-image.png}
+    \caption{Authentication verification code image}
 \end{figure}
 
-\subsection{Main Login Page}
+\subsubsection{Main Login Page}
 
 \textbf{Purpose:} Renders the login page where existing users can sign in to their account. If redirected from another page with a \texttt{toastMessage} in the route state, it displays it automatically as a success toast.
 
@@ -109,9 +113,10 @@ The authentication architecture provides secure user onboarding, identity verifi
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-login-image.png}
+    \caption{Authentication login image}
 \end{figure}
 
-\subsection{LoginForm Component}
+\subsubsection{LoginForm Component}
 
 \textbf{Purpose:} Processes existing user entry credentials by validating email and password pairs against backend microservices, establishing authenticated states, and presenting a nested operational route to handle password resets.
 
@@ -142,10 +147,11 @@ The authentication architecture provides secure user onboarding, identity verifi
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-logincode-image.png}
+    \caption{Authentication login code image}
 \end{figure}
 
 
-\subsection{SocialLogin Component}
+\subsubsection{SocialLogin Component}
 
 \textbf{Purpose:} Displays three social login buttons (Google, Discord, GitHub) that redirect the user to the backend OAuth authentication endpoints.
 
@@ -162,9 +168,10 @@ The authentication architecture provides secure user onboarding, identity verifi
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-logingoogle-image.png}
+    \caption{Authentication login google image}
 \end{figure}
 
-\subsection{SocialCallback Page}
+\subsubsection{SocialCallback Page}
 
 \textbf{Purpose:} Handles the redirect landing after a third-party OAuth login (Google, GitHub, Discord) by exchanging the returned ticket for auth tokens and completing the login flow.
 
@@ -187,7 +194,7 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item Delegates all logic to the \texttt{useSocialLogin} hook, keeping the component purely presentational.
 \end{itemize}
 
-\subsection{useSocialLogin Hook}
+\subsubsection{useSocialLogin Hook}
 
 \textbf{Purpose:} Extracts the \texttt{ticket} query parameter from the OAuth callback URL, exchanges it for auth tokens via the backend, stores them, and redirects the user accordingly.
 
@@ -206,9 +213,10 @@ The authentication architecture provides secure user onboarding, identity verifi
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-loginhook-image.png}
+    \caption{Authentication login hook image}
 \end{figure}
 
-\subsection{Main ResetPassword Page}
+\subsubsection{Main ResetPassword Page}
 
 \textbf{Purpose:} Renders the password reset page where users enter the reset code received by email along with a new password to complete the reset process.
 
@@ -226,13 +234,15 @@ The authentication architecture provides secure user onboarding, identity verifi
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-resetpass1-image.png}
+    \caption{Authentication reset password image}
 \end{figure}
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-resetpass2-image.png}
+    \caption{Authentication reset password email image}
 \end{figure}
 
-\subsection{ResetPasswordForm Component}
+\subsubsection{ResetPasswordForm Component}
 
 \textbf{Purpose:} Collects the reset code sent to the user's email and a new password, then submits them to the backend to complete the password reset flow.
 

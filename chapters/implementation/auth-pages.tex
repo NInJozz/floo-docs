@@ -16,7 +16,14 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item \texttt{ToastContainer} --- Context provider wrapper for rendering asynchronous status notifications.
 \end{itemize}
 
-
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-signup1-image.png}
+\end{figure}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-signup2-image.png}
+\end{figure}
 
 \subsection{RegisterForm Component}
 
@@ -54,7 +61,10 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item \texttt{ToastContainer} --- Renders status messages and error alerts.
 \end{itemize}
 
-
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-verify-image.png}
+\end{figure}
 
 \subsection{VerifyEmailForm Component}
 
@@ -74,7 +84,32 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item Relies on isolated \texttt{react-toastify} context blocks to present inline confirmation alerts or format server execution rejections.
 \end{itemize}
 
+\subsection{Verification Email}
 
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-verifycode-image.png}
+\end{figure}
+
+\subsection{Main Login Page}
+
+\textbf{Purpose:} Renders the login page where existing users can sign in to their account. If redirected from another page with a \texttt{toastMessage} in the route state, it displays it automatically as a success toast.
+
+\vspace{0.2cm}
+\noindent\textbf{Route:} \texttt{/login}
+
+\vspace{0.2cm}
+\noindent\textbf{Components Used:}
+\begin{itemize}
+    \item \texttt{SimpleNavbar} --- Top navigation bar displaying a "Sign Up" link directing new users to \texttt{/register}.
+    \item \texttt{LoginForm} --- Login form handling email/password input, forgot password flow, and social login options.
+    \item \texttt{ToastContainer} --- Renders toast notifications within the page.
+\end{itemize}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-login-image.png}
+\end{figure}
 
 \subsection{LoginForm Component}
 
@@ -104,20 +139,10 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item Extends application availability metrics by exposing the \texttt{SocialLogin} block, resolving instant federation profiles across Google, Discord, and GitHub identity systems.
 \end{itemize}
 
-\subsection{Main Login Page}
-
-\textbf{Purpose:} Renders the login page where existing users can sign in to their account. If redirected from another page with a \texttt{toastMessage} in the route state, it displays it automatically as a success toast.
-
-\vspace{0.2cm}
-\noindent\textbf{Route:} \texttt{/login}
-
-\vspace{0.2cm}
-\noindent\textbf{Components Used:}
-\begin{itemize}
-    \item \texttt{SimpleNavbar} --- Top navigation bar displaying a "Sign Up" link directing new users to \texttt{/register}.
-    \item \texttt{LoginForm} --- Login form handling email/password input, forgot password flow, and social login options.
-    \item \texttt{ToastContainer} --- Renders toast notifications within the page.
-\end{itemize}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-logincode-image.png}
+\end{figure}
 
 
 \subsection{SocialLogin Component}
@@ -134,6 +159,10 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item Authentication flow is handled entirely by the backend after the redirect.
 \end{itemize}
 
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-logingoogle-image.png}
+\end{figure}
 
 \subsection{SocialCallback Page}
 
@@ -174,6 +203,10 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item On failure, redirects to \texttt{/login} with a generic error toast.
 \end{itemize}
 
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-loginhook-image.png}
+\end{figure}
 
 \subsection{Main ResetPassword Page}
 
@@ -190,6 +223,14 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item \texttt{ToastContainer} --- Renders toast notifications.
 \end{itemize}
 
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-resetpass1-image.png}
+\end{figure}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-resetpass2-image.png}
+\end{figure}
 
 \subsection{ResetPasswordForm Component}
 

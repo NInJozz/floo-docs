@@ -1,0 +1,216 @@
+\section{Authentication Pages Implementation}
+The authentication architecture provides secure user onboarding, identity verification, and session persistence, abstracted into modular React components integrated with global context and backend authentication routines.
+
+\subsection{Main Register Page}
+
+\textbf{Purpose:} Displays the registration portal where new users can create an account. It also processes incoming location state to render success toast notifications if a user was redirected from another flow with an active message.
+
+\vspace{0.2cm}
+\noindent\textbf{Route:} \texttt{/register}
+
+\vspace{0.2cm}
+\noindent\textbf{Components Used:}
+\begin{itemize}
+    \item \texttt{SimpleNavbar} --- Minimalist top navigation bar containing a direct link to the login page for existing users.
+    \item \texttt{RegisterForm} --- The primary interactive form component managing user registration fields and logic.
+    \item \texttt{ToastContainer} --- Context provider wrapper for rendering asynchronous status notifications.
+\end{itemize}
+
+
+
+\subsection{RegisterForm Component}
+
+\textbf{Purpose:} Handles new user registration by collecting credentials (first name, last name, email, and password) and submitting them to the API. Upon successful resolution, it populates global state, local storage, and client-side cookies before passing the user to the verification pipeline.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{src/pages/Auth/components/RegisterForm.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Notes:}
+\begin{itemize}
+    \item Delegates network operations to \texttt{AuthService.register()} to cleanly dispatch form payloads to the backend application.
+    \item On a successful API response, injects the generated \texttt{accessToken}, \texttt{refreshToken}, and \texttt{userDetails} directly into the global \texttt{UserContext} via \texttt{setAuth}.
+    \item Hardens client-side security by simultaneously saving the \texttt{accessToken}, \texttt{refreshToken}, and \texttt{userDetails} to cookies utilizing \texttt{js-cookie} with strict \texttt{secure: true} and \texttt{sameSite: "Strict"} parameters.
+    \item Temporarily commits the user's submitted email address to \texttt{localStorage} under the key \texttt{registeredEmail} to cleanly pass contextual data to the subsequent verification view.
+    \item Automatically transfers focus to the \texttt{/verify-email} route, carrying along an explicit success message inside the React Router \texttt{navigate} state configuration.
+    \item Optimizes form responsiveness by rendering an inline loading spinner inside the core submission button element and disabling further user interactions while requests are in flight.
+    \item Wraps input operations using a reusable \texttt{PasswordToggle} visibility sub-component, accompanied by clear inline validation rules (demanding at least 8 characters, alongside uppercase, lowercase, numeric, and symbolic characters).
+    \item Mounts the \texttt{SocialLogin} component at the base of the form view, presenting automated OAuth integrations with third-party networks (Google, Discord, and GitHub).
+    \item Gracefully catches system rejections and errors via \texttt{react-toastify}, converting verbose server exceptions into readable text utilizing an isolated \texttt{apiErrorMessage} utility function.
+\end{itemize}
+
+\subsection{Main VerifyEmail Page}
+
+\textbf{Purpose:} Renders the verification layout, acting as a security gateway where recently registered users must provide the valid 6-digit confirmation token delivered to their inbox.
+
+\vspace{0.2cm}
+\noindent\textbf{Route:} \texttt{/verify-email}
+
+\vspace{0.2cm}
+\noindent\textbf{Components Used:}
+\begin{itemize}
+    \item \texttt{SimpleNavbar} --- Secondary top navigation configured with a "Sign up" route to safely guide users back to the registration screen.
+    \item \texttt{VerifyEmailForm} --- The interactive form component engineered to capture and process the multi-digit verification string.
+    \item \texttt{ToastContainer} --- Renders status messages and error alerts.
+\end{itemize}
+
+
+
+\subsection{VerifyEmailForm Component}
+
+\textbf{Purpose:} Captures user input for the 6-digit email confirmation code, transmits it to the backend for verification, and alters the user's workflow trajectory based on their entry point context.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{src/pages/Auth/components/VerifyEmailForm.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Notes:}
+\begin{itemize}
+    \item Executes \texttt{AuthService.verifyEmail()} to check token accuracy against the database schemas.
+    \item On token validation, updates local user states and caches updated \texttt{accessToken}, \texttt{refreshToken}, and \texttt{userDetails} tokens inside browser instances using secure \texttt{js-cookie} settings.
+    \item Runs an internal structural check to map subsequent application routing: if the workflow originated from a standard email update request, it redirects straight to \texttt{/overview}; otherwise, it routes to \texttt{/login} appended with an authentication success notification.
+    \item Packages a strict 60-second reactive countdown timer component; upon completion, it reveals a "Resend new code" interactive field that binds to \texttt{AuthService.resendEmailVerificationCode()} to restart the timer lifecycle.
+    \item Employs responsive inline loading indicators inside both the token submission and resend controls to handle blocking behavior during API polling cycles.
+    \item Relies on isolated \texttt{react-toastify} context blocks to present inline confirmation alerts or format server execution rejections.
+\end{itemize}
+
+
+
+\subsection{LoginForm Component}
+
+\textbf{Purpose:} Processes existing user entry credentials by validating email and password pairs against backend microservices, establishing authenticated states, and presenting a nested operational route to handle password resets.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{src/pages/Auth/components/LoginForm.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Component Props:}
+\begin{itemize}
+    \item \texttt{showPassword} (Boolean) --- Manages the immediate masking or unmasking state of plain-text passwords.
+    \item \texttt{setShowPassword} (Function) --- State mutator function handling the explicit toggle state of password fields.
+    \item \texttt{userContext} (Object) --- The foundational context object exposing user parameters and the global \texttt{setAuth} mutator method.
+    \item \texttt{navigate} (Function) --- Instantiated instance hook of the React Router application navigator passed down from the parent shell.
+\end{itemize}
+
+\vspace{0.2cm}
+\noindent\textbf{Notes:}
+\begin{itemize}
+    \item Integrates closely with \texttt{AuthService.login()} to coordinate client authorization requests.
+    \item Following token validation, maps server variables into the centralized application \texttt{UserContext} and commits authentication state into secure, protected browser cookies flags.
+    \item Accelerates client-side transitions by smoothly redirecting validated user profiles straight onto the \texttt{/overview} platform dashboard page alongside validation notifications.
+    \item Provides an embedded recovery pathway: selecting the "Forgot Password?" anchor routes code execution to \texttt{AuthService.forgotPassword()} to trigger a server-side reset email, shifting the routing context to \texttt{/forgot-password}.
+    \item Toggles a processing spinner inside the main form button element during active asynchronous processes, disabling subsequent actions to eliminate race conditions or repetitive operations.
+    \item Uses an absolute integration layer with \texttt{react-toastify} to catch, map, and output validation flags or server authentication rejections.
+    \item Extends application availability metrics by exposing the \texttt{SocialLogin} block, resolving instant federation profiles across Google, Discord, and GitHub identity systems.
+\end{itemize}
+
+\subsection{Main Login Page}
+
+\textbf{Purpose:} Renders the login page where existing users can sign in to their account. If redirected from another page with a \texttt{toastMessage} in the route state, it displays it automatically as a success toast.
+
+\vspace{0.2cm}
+\noindent\textbf{Route:} \texttt{/login}
+
+\vspace{0.2cm}
+\noindent\textbf{Components Used:}
+\begin{itemize}
+    \item \texttt{SimpleNavbar} --- Top navigation bar displaying a "Sign Up" link directing new users to \texttt{/register}.
+    \item \texttt{LoginForm} --- Login form handling email/password input, forgot password flow, and social login options.
+    \item \texttt{ToastContainer} --- Renders toast notifications within the page.
+\end{itemize}
+
+
+\subsection{SocialLogin Component}
+
+\textbf{Purpose:} Displays three social login buttons (Google, Discord, GitHub) that redirect the user to the backend OAuth authentication endpoints.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{src/pages/Auth/components/SocialLogin.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Behavior:}
+\begin{itemize}
+    \item Each button redirects the browser to the corresponding backend OAuth endpoint defined in \texttt{apiUrls.js}.
+    \item Authentication flow is handled entirely by the backend after the redirect.
+\end{itemize}
+
+
+\subsection{SocialCallback Page}
+
+\textbf{Purpose:} Handles the redirect landing after a third-party OAuth login (Google, GitHub, Discord) by exchanging the returned ticket for auth tokens and completing the login flow.
+
+\vspace{0.2cm}
+\noindent\textbf{Route:} \texttt{/auth/callback}
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{src/pages/Auth/SocialCallback.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Hook Used:}
+\begin{itemize}
+    \item \texttt{useSocialLogin} --- Encapsulates all callback logic; the component only renders a loading UI while the hook runs.
+\end{itemize}
+
+\vspace{0.2cm}
+\noindent\textbf{Behavior:}
+\begin{itemize}
+    \item Displays a centered spinner and a "Please wait..." message while authentication is being processed.
+    \item Delegates all logic to the \texttt{useSocialLogin} hook, keeping the component purely presentational.
+\end{itemize}
+
+\subsection{useSocialLogin Hook}
+
+\textbf{Purpose:} Extracts the \texttt{ticket} query parameter from the OAuth callback URL, exchanges it for auth tokens via the backend, stores them, and redirects the user accordingly.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{src/hooks/useSocialLogin.js}
+
+\vspace{0.2cm}
+\noindent\textbf{Behavior:}
+\begin{itemize}
+    \item Runs once on mount using a \texttt{useRef} guard to prevent duplicate executions in React Strict Mode.
+    \item If no \texttt{ticket} is found in the URL, redirects to \texttt{/login} with an error toast.
+    \item On success, stores \texttt{accessToken}, \texttt{refreshToken}, and \texttt{userDetails} in both \texttt{UserContext} and browser cookies, then redirects to \texttt{/overview} with a success toast.
+    \item On failure, redirects to \texttt{/login} with a generic error toast.
+\end{itemize}
+
+
+\subsection{Main ResetPassword Page}
+
+\textbf{Purpose:} Renders the password reset page where users enter the reset code received by email along with a new password to complete the reset process.
+
+\vspace{0.2cm}
+\noindent\textbf{Route:} \texttt{/forgot-password}
+
+\vspace{0.2cm}
+\noindent\textbf{Components Used:}
+\begin{itemize}
+    \item \texttt{SimpleNavbar} --- Top navigation with a "Sign in" link to go back to login.
+    \item \texttt{ResetPasswordForm} --- The reset code and new password form.
+    \item \texttt{ToastContainer} --- Renders toast notifications.
+\end{itemize}
+
+
+\subsection{ResetPasswordForm Component}
+
+\textbf{Purpose:} Collects the reset code sent to the user's email and a new password, then submits them to the backend to complete the password reset flow.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{src/pages/Auth/components/ResetPasswordForm.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Props:}
+\begin{itemize}
+    \item \texttt{userContext} (Object) $\rightarrow$ Global auth context used to retrieve the user's email.
+    \item \texttt{Navigate} (Function) $\rightarrow$ React Router navigation function passed from parent.
+\end{itemize}
+
+\vspace{0.2cm}
+\noindent\textbf{Behavior:}
+\begin{itemize}
+    \item Submits the reset code, new password, and resolved email to the backend via \texttt{AuthService.resetPassword()}.
+    \item On success, redirects to \texttt{/login} with a success toast message.
+    \item Password field uses the reusable \texttt{PasswordToggle} component for show/hide functionality.
+    \item Displays an inline spinner on the submit button while the request is in progress.
+    \item Errors are surfaced via \texttt{react-toastify} toast notifications.
+\end{itemize}

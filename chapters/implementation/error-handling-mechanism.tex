@@ -1,12 +1,12 @@
-\section{Error Handling Mechanism}
+\subsection{Error Handling Mechanism}
 
-\subsection{Overview}
+\subsubsection{Overview}
 The error handling mechanism provides consistent and maintainable error management across all layers of the application. It is built around a registry pattern that decouples error detection and response logic from 
 the middleware layer, allowing new error types to be added without modifying any existing code.
 
-\subsection{Core Abstractions}
+\subsubsection{Core Abstractions}
 
-\subsubsection{The IErrorHandler Interface}
+\paragraph{The IErrorHandler Interface}
 The foundation of the system is the \texttt{IErrorHandler} interface, which defines a unified contract that all error handlers must fulfill:
 
 \begin{itemize}
@@ -16,7 +16,7 @@ The foundation of the system is the \texttt{IErrorHandler} interface, which defi
 
 The use of \texttt{unknown} as the type for \texttt{err} in both methods ensures that every concrete handler fully honors the interface contract. Type narrowing happens internally inside each handler's \texttt{handle()} method, where the cast is safe because \texttt{canHandle()} has already confirmed the error type.
 
-\subsubsection{The AppError Class}
+\paragraph{The AppError Class}
 \texttt{AppError} is a custom error class that extends the native JavaScript \texttt{Error}. It is used throughout the application to represent known, expected failures such as resource not found or unauthorized access. It carries three properties:
 
 \begin{itemize}
@@ -25,9 +25,9 @@ The use of \texttt{unknown} as the type for \texttt{err} in both methods ensures
     \item \texttt{payload} — optional additional data attached to the response.
 \end{itemize}
 
-\subsection{The Handler Registry Pattern}
+\subsubsection{The Handler Registry Pattern}
 
-\subsubsection{Structure}
+\paragraph{Structure}
 Each error category is encapsulated in its own self-contained handler class. The system includes the following handlers:
 
 \begin{itemize}
@@ -48,11 +48,11 @@ Each error category is encapsulated in its own self-contained handler class. The
     \item \texttt{RateLimitErrorHandler} — handles application rate limiting errors by detecting excessive client requests and returning an appropriate rate limit response.
   \end{itemize}
 
-\subsubsection{The Registry}
+\paragraph{The Registry}
 The \texttt{errorHandlerRegistry} is an ordered array of handler instances. The middleware iterates through it and delegates to the first handler whose \texttt{canHandle()} returns \texttt{true}. Order is 
 significant: specific handlers must precede general ones, and \texttt{UnexpectedErrorHandler} must always be last.
 
-\subsection{The Error Handler Middleware}
+\subsubsection{The Error Handler Middleware}
 The middleware contains no error-type-specific logic. It iterates the registry and delegates entirely:
 
 \begin{lstlisting}
@@ -62,7 +62,7 @@ export const errorHandler = (err, req, res, next) => {
 };
 \end{lstlisting}
 
-\subsection{Extending the System}
+\subsubsection{Extending the System}
 Adding support for a new third-party library error requires two steps:
 
 \begin{enumerate}
@@ -71,7 +71,7 @@ Adding support for a new third-party library error requires two steps:
 
 For known, expected application failures such as not found or unauthorized, no new handler is needed. Throwing \texttt{new AppError(message, statusCode)} anywhere in the application is sufficient, as \texttt{AppErrorHandler} handles it automatically.
 
-\subsection{Design Evaluation}
+\subsubsection{Design Evaluation}
 The error handling mechanism offers clear separation of concerns — each handler owns both the detection and response logic for exactly one error category. The middleware is fully decoupled from third-party libraries, 
 depending only on the \texttt{IErrorHandler} abstraction. Each handler is independently testable, with unit tests verifying detection and response logic in isolation. Adding a new error type extends the system 
 without modifying any existing code.

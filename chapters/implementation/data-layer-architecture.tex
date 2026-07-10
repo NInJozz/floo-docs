@@ -1,6 +1,6 @@
-\section{Data Layer Architecture}
+\subsection{Data Layer Architecture}
 
-\subsection{Database Requirements}
+\subsubsection{Database Requirements}
 The FLOO platform requires a robust, relational data storage layer capable of supporting multi-tenant isolation, complex configuration storage, and strict security compliance. The primary storage needs encompass:
 \begin{itemize}
     \item \textbf{User and Identity Management:} Tracking local user profiles, multi-provider OAuth identities, and RBAC roles to ensure secure, isolated workspaces.
@@ -11,7 +11,7 @@ The FLOO platform requires a robust, relational data storage layer capable of su
 
 \textbf{Key Drivers:} Relational integrity is paramount due to the highly interconnected nature of the platform. For example, a User owns Projects, which trigger Executions, which in turn generate NodeOutputs. Transactional safety is explicitly required for operations like cascading account deletions, ensuring that scrubbing a user removes all associated relational assets without creating orphaned records. Prisma was selected as the ORM to enforce these strict foreign key constraints while providing end-to-end type safety with the TypeScript backend.
 
-\subsection{Conceptual Design (ERD)}
+\subsubsection{Conceptual Design (ERD)}
 The Conceptual Entity Relationship Diagram (CERD) outlines the high-level business entities and their interactions.
 
 %\begin{figure}[H]
@@ -21,7 +21,7 @@ The Conceptual Entity Relationship Diagram (CERD) outlines the high-level busine
  %   \label{fig:cerd}
 %\end{figure}
 
-\subsubsection{Core Entity Relationships}
+\paragraph{Core Entity Relationships}
 The conceptual model is heavily centered around the \texttt{User} entity, enforcing a strict ownership hierarchy:
 \begin{itemize}
     \item \textbf{Users to Projects (1:N):} A single user can create and manage multiple automation projects. All workflow executions, chat histories, and node interactions branch off this fundamental relationship.
@@ -29,7 +29,7 @@ The conceptual model is heavily centered around the \texttt{User} entity, enforc
     \item \textbf{Nodes to Files (1:N):} External files are represented conceptually as inputs and outputs bound to specific execution instances and nodes, tracking cloud storage references.
 \end{itemize}
 
-\subsubsection{The Dynamic Credential Architecture}
+\paragraph{The Dynamic Credential Architecture}
 A major architectural redesign was implemented in the credentials subsystem to provide a deep, highly flexible solution that seamlessly bridges backend storage with dynamic frontend UI rendering. 
 
 Instead of hardcoding specific integration tokens into a single table, the system abstracts credentials into a definition-and-value pattern:
@@ -39,7 +39,7 @@ Instead of hardcoding specific integration tokens into a single table, the syste
     \item \textbf{Value Phase:} When a user connects an integration, the system generates a \texttt{UserCredentialSet} linking to the \texttt{CredentialType}. The actual encrypted secrets are stored in \texttt{UserCredentialValue} records, creating a normalized mapping back to the expected parameters.
 \end{itemize}
 
-\subsection{Mapping to Relational Model (Logical/Physical Design)}
+\subsubsection{Mapping to Relational Model (Logical/Physical Design)}
 The logical design translates the conceptual entities into concrete database tables, explicitly defining keys, data types, and constraints utilizing the Prisma schema.
 
 %\begin{figure}[H]
@@ -50,39 +50,39 @@ The logical design translates the conceptual entities into concrete database tab
 %    \label{fig:perd}
 %\end{figure}
 
-\subsubsection{Primary and Foreign Key Strategy}
+\paragraph{Primary and Foreign Key Strategy}
 \begin{itemize}
     \item \textbf{Universal UUIDs:} All primary keys (PK) across the platform utilize auto-generated UUIDs (e.g., \texttt{@id @default(uuid())}). This strategy prevents resource enumeration attacks and ensures global uniqueness, particularly useful when merging distributed data.
     \item \textbf{Composite Constraints:} Certain tables utilize composite keys to enforce logical uniqueness. For example, \texttt{AuthIdentityProvider} uses \texttt{@@id([provider, providerId])} to ensure a user cannot link the same third-party account twice. Similarly, \texttt{UserCredentialValue} enforces \texttt{@@unique([setId, paramId])} to guarantee only one value exists per parameter in a given credential set.
     \item \textbf{Aggressive Cascading Deletions:} To maintain strict data hygiene and comply with PII scrubbing requirements, foreign keys aggressively employ \texttt{onDelete: Cascade}. Deleting a User cascades down to erase their Projects, which in turn wipes Executions, Node Inputs, and Chat Messages instantly at the database level.
 \end{itemize}
 
-\subsubsection{Junction and Mapping Tables}
+\paragraph{Junction and Mapping Tables}
 The database features specific mapping tables to resolve complex relationships. \texttt{UserCredentialValue} serves as the critical junction between a user's \texttt{UserCredentialSet} and the system's \texttt{CredentialParameterType}. This normalized approach ensures that if a parameter requirement changes at the system level, the relationship to the user's stored values remains structurally intact.
 
-\subsubsection{Intentional Denormalization (JSON Workflows)}
+\paragraph{Intentional Denormalization (JSON Workflows)}
 While the database is heavily normalized, a deliberate exception was made for workflow graph configurations. Rather than splitting workflow nodes, edges, and positions into dozens of relational tables, the entire graph is serialized and stored in a \texttt{Json} column within the \texttt{Project} table (\texttt{workflow Json?}). 
 
 This is a strategic design choice: workflow graphs are exclusively read and updated as a single atomic unit by the React Flow frontend. Normalizing the graph would require complex, expensive recursive SQL joins upon every canvas load. Utilizing a JSON column provides the necessary schema flexibility for varied node data while preserving high-performance read/write operations.
 
-\subsection{Physical Database Design \& Implementation}
+\subsubsection{Physical Database Design \& Implementation}
 
 The physical database layer is implemented using PostgreSQL hosted on Supabase. We utilize Prisma ORM to enforce end-to-end type safety across the application. The schema is maintained through declarative migrations, ensuring that the database state is always synchronized with our TypeScript interfaces. Sensitive data, such as integration credentials, is stored using standard text fields, with robust encryption and decryption logic handled strictly at the Service Layer before ever reaching the persistence layer.
 
-\subsubsection{Database Engine: PostgreSQL (via Supabase)}
+\paragraph{Database Engine: PostgreSQL (via Supabase)}
 PostgreSQL was selected as the underlying engine for its strict adherence to ACID compliance, robust support for relational integrity, and advanced JSON processing capabilities. Hosting via Supabase provides managed scaling, automated backups, and connection pooling, ensuring the database can handle high-frequency reads and writes typical of an automated workflow engine.
 
-\subsubsection{ORM Layer (Prisma)}
+\paragraph{ORM Layer (Prisma)}
 Prisma acts as the bridge between the Node.js backend and the PostgreSQL database. Rather than writing raw SQL queries, the application relies on the generated Prisma Client.
 \begin{itemize}
     \item \textbf{Type Safety:} The `schema.prisma` file serves as the single source of truth. Changes to the schema automatically regenerate TypeScript definitions, ensuring that any mismatched queries, missing fields, or incorrect data types are caught at compile-time rather than throwing unexpected runtime errors.
     \item \textbf{JSON Workflows:} Prisma natively supports PostgreSQL's `JSONB` data type, allowing the `Project` table to store complex, nested React Flow graphs in the `workflow` column without sacrificing query performance or requiring excessive normalization.
 \end{itemize}
 
-\subsubsection{Migration Management}
+\paragraph{Migration Management}
 Database schema evolution is managed via Prisma Migrations. Instead of executing manual SQL scripts directly against production, developers modify the declarative Prisma schema. The migration engine then generates deterministic SQL differential scripts. This approach ensures that schema changes are strictly version-controlled, reproducible across local, staging, and production environments, and seamlessly integrated into the CI/CD pipeline.
 
-\subsubsection{Technical Constraints}
+\paragraph{Technical Constraints}
 To guarantee data integrity and query performance at scale, several constraints are baked directly into the physical schema:
 
 \paragraph{Indexes}
@@ -107,10 +107,10 @@ This is highly crucial for the platform's \textbf{Account Deletion Flow}. When a
 
 % ---------------------------------------------------------
 
-\subsection{Data Dictionary}
+\subsubsection{Data Dictionary}
 The following tables detail the physical layout, constraints, and definitions of the core entities in the FLOO system.
 
-\subsubsection{User Table}
+\paragraph{User Table}
 Serves as the root entity for identity, access control, and ownership.
 \begin{table}[H]
 \centering
@@ -134,7 +134,7 @@ Serves as the root entity for identity, access control, and ownership.
 \label{tab:dict-user}
 \end{table}
 
-\subsubsection{Project Table}
+\paragraph{Project Table}
 Stores the configuration and state of the user's workflow automations.
 \begin{table}[H]
 \centering
@@ -158,7 +158,7 @@ Stores the configuration and state of the user's workflow automations.
 \label{tab:dict-project}
 \end{table}
 
-\subsubsection{UserCredentialSet Table}
+\paragraph{UserCredentialSet Table}
 Acts as the parent entity for a group of encrypted third-party integration secrets.
 \begin{table}[H]
 \centering
@@ -180,7 +180,7 @@ Acts as the parent entity for a group of encrypted third-party integration secre
 \label{tab:dict-credentialset}
 \end{table}
 
-\subsubsection{Execution Table}
+\paragraph{Execution Table}
 Persists the lifecycle state and telemetry data for individual workflow runs.
 \begin{table}[H]
 \centering

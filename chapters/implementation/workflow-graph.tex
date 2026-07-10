@@ -1,4 +1,4 @@
-\section{Workflow Graph Construction and Pre-Execution Validation}
+\subsection{Workflow Graph Construction and Pre-Execution Validation}
  
 Before any workflow can be executed, the system must transform the raw JSON
 payload sent by the frontend into a structured, in-memory graph, and then
@@ -7,7 +7,7 @@ successive phases: \textit{graph construction} and \textit{pre-execution
 validation}. Both phases complete before a single job is enqueued, ensuring
 that the execution engine only receives well-formed, executable workflows.
  
-\subsection{Data Model}
+\subsubsection{Data Model}
  
 The type system that underpins the entire workflow engine is defined in
 \texttt{workflow.type.ts}. Three core interfaces model the graph structure.
@@ -62,13 +62,13 @@ export interface IWorkflowExecutionContext {
 }
 \end{lstlisting}
  
-\subsection{The \texttt{WorkflowGraph} Class}
+\subsubsection{The \texttt{WorkflowGraph} Class}
  
 The \texttt{WorkflowGraph} class wraps an \texttt{IWorkflowGraph} value
 object with an \textit{adjacency list} for efficient traversal, and exposes
 graph operations used by both the validation and execution layers.
  
-\subsubsection{Internal Representation}
+\paragraph{Internal Representation}
  
 The class maintains two parallel data structures:
  
@@ -118,7 +118,7 @@ before mutating state, throwing an \texttt{AppError} if the node or edge is
 already present. This prevents malformed workflow payloads from producing
 silent inconsistencies in the graph.
  
-\subsubsection{Finding Trigger Nodes}
+\paragraph{Finding Trigger Nodes}
  
 A trigger node is structurally defined as a node with no incoming edges ---
 it sits at the root of a connected component. \texttt{findTriggerNodes}
@@ -144,7 +144,7 @@ node \textit{not} in that set has an in-degree of zero and is therefore a
 candidate trigger. The subsequent validation step then confirms, via the node
 registry, that each such candidate is actually declared as a trigger node type.
  
-\subsubsection{Decomposing into Connected Components}
+\paragraph{Decomposing into Connected Components}
  
 A workflow canvas may contain multiple independent sub-workflows. Rather than
 validating and executing the entire graph as one unit, the system first
@@ -209,7 +209,7 @@ disjoint nodes that happen to feed into the same component via reverse edges.
 Using both the forward adjacency list and the reverse map guarantees that every
 node is assigned to exactly one component regardless of edge direction.
  
-\subsection{Graph Construction from the HTTP Request}
+\subsubsection{Graph Construction from the HTTP Request}
  
 The \texttt{getWorkflowGraph} function in
 \texttt{workflow-pre-execution.validations.ts} is the entry point for turning
@@ -217,7 +217,7 @@ a raw request payload into a typed \texttt{WorkflowGraph} instance. It is
 called by the workflow controller immediately after the project record is
 fetched from the database.
  
-\subsubsection{Input Format}
+\paragraph{Input Format}
  
 The frontend serialises the workflow canvas as a JSON object containing a
 \texttt{nodes} array and a \texttt{connections} array. Each node object
@@ -251,7 +251,7 @@ a nested \texttt{data.nodeName} field rather than at the top level:
 }
 \end{lstlisting}
  
-\subsubsection{Parsing and Validation}
+\paragraph{Parsing and Validation}
  
 The function first validates the shape of the incoming data, then maps each
 raw node object to a typed \texttt{INode}, and finally populates the graph:
@@ -316,7 +316,7 @@ workflow runner populates it recursively at deployment time via
 \texttt{buildChildren}, so that the full execution tree travels with each job
 without requiring further graph lookups.
  
-\subsection{Pre-Execution Validation Pipeline}
+\subsubsection{Pre-Execution Validation Pipeline}
  
 Validation is orchestrated by \texttt{validateAllWorkflows}, which runs each
 connected component through a sequence of checks. The function returns a
@@ -368,9 +368,9 @@ export const validateAllWorkflows =
 \end{lstlisting}
  
 The three validators are applied in a deliberate order, described in the
-following subsections.
+following subsubsections.
  
-\subsubsection{Trigger Node Validation}
+\paragraph{Trigger Node Validation}
  
 \texttt{validateTriggerNodes} enforces three structural rules:
  
@@ -418,7 +418,7 @@ const validateTriggerNodes =
 };
 \end{lstlisting}
  
-\subsubsection{Node Registry Validation}
+\paragraph{Node Registry Validation}
  
 \texttt{checkAllNodesValidation} ensures that every non-trigger node in the
 component is registered in the \texttt{NodeRegistry}. Trigger nodes are
@@ -448,7 +448,7 @@ and returned as a list, which the orchestrator formats into a single error
 message. This allows the user to see all unregistered nodes in one response
 rather than having to fix them one by one.
  
-\subsubsection{Cycle Detection}
+\paragraph{Cycle Detection}
  
 The cycle check is the last to run and only executes if both preceding checks
 pass. This ordering is intentional: running a DFS-based cycle detector on a
@@ -503,7 +503,7 @@ have been processed without finding a back edge, the node is marked
 disconnected components --- if \texttt{findConnectedComponents} was bypassed
 --- are also checked.
  
-\subsection{Validation Ordering and Error Accumulation}
+\subsubsection{Validation Ordering and Error Accumulation}
  
 The order in which the three validators run is not arbitrary. Table
 \ref{tab:validation-order} summarises the rationale for their sequence.

@@ -125,12 +125,24 @@ The authentication architecture provides secure user onboarding, identity verifi
 
 \vspace{0.2cm}
 \noindent\textbf{Component Props:}
-\begin{itemize}
-    \item \texttt{showPassword} (Boolean) --- Manages the immediate masking or unmasking state of plain-text passwords.
-    \item \texttt{setShowPassword} (Function) --- State mutator function handling the explicit toggle state of password fields.
-    \item \texttt{userContext} (Object) --- The foundational context object exposing user parameters and the global \texttt{setAuth} mutator method.
-    \item \texttt{navigate} (Function) --- Instantiated instance hook of the React Router application navigator passed down from the parent shell.
-\end{itemize}
+\begin{table}[htbp]
+\centering
+\caption{LoginForm configuration properties}
+\label{tab:login-parameters}
+\begin{tabular}{|p{4.5cm}|p{8.5cm}|}
+\hline
+\textbf{Property} & \textbf{Description} \\
+\hline
+\texttt{showPassword} (Boolean) & Manages the immediate masking or unmasking state of plain-text passwords. \\
+\hline
+\texttt{setShowPassword} (Function) & State mutator function handling the explicit toggle state of password fields. \\
+\hline
+\texttt{userContext} (Object) & The foundational context object exposing user parameters and the global \texttt{setAuth} mutator method. \\
+\hline
+\texttt{navigate} (Function) & Instantiated instance hook of the React Router application navigator passed down from the parent shell. \\
+\hline
+\end{tabular}
+\end{table}
 
 \vspace{0.2cm}
 \noindent\textbf{Notes:}
@@ -144,12 +156,41 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item Extends application availability metrics by exposing the \texttt{SocialLogin} block, resolving instant federation profiles across Google, Discord, and GitHub identity systems.
 \end{itemize}
 
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-logincode-image.png}
-    \caption{Authentication login code image}
-\end{figure}
+\begin{lstlisting}
+const handleSubmit = async (event) => {
+    event.preventDefault();
+    setIsLoading(true);
 
+    const formData = new FormData(event.target);
+    const loginData = {
+      email: formData.get("email"),
+      password: formData.get("password"),
+    };
+
+    try {
+      const responseData = await AuthService.login(loginData);
+      const user = responseData.data.user;
+
+      userContext.setAuth({
+        accessToken: responseData.data.accessToken,
+        refreshToken: responseData.data.refreshToken,
+        userDetails: user,
+      });
+
+      Cookies.set("accessToken", responseData.data.accessToken, { secure: true, sameSite: "Strict" });
+      Cookies.set("refreshToken", responseData.data.refreshToken, { secure: true, sameSite: "Strict" });
+      Cookies.set("userDetails", JSON.stringify(user), { secure: true, sameSite: "Strict" });
+
+      const destination = user.role === "ADMIN" ? "/admin/users" : "/overview";
+      navigate(destination, { state: { toastMessage: "You logged in successfully🎉." } });
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error(apiErrorMessage(error, "Failed to login user"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+\end{lstlisting}
 
 \subsubsection{SocialLogin Component}
 
@@ -210,11 +251,44 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item On failure, redirects to \texttt{/login} with a generic error toast.
 \end{itemize}
 
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-loginhook-image.png}
-    \caption{Authentication login hook image}
-\end{figure}
+\begin{lstlisting}
+useEffect(() => {
+        if (calledRef.current) return; // run once
+        calledRef.current = true;
+
+        const params = new URLSearchParams(location.search);
+        const ticket = params.get("ticket");
+
+        if (!ticket) {
+        navigate("/login", { state: { toastMessage: "Invalid login callback!" } });
+        return;
+        }
+
+        const performLogin = async () => {
+            try {
+                const data = await AuthService.exchangeTicket(ticket);
+
+                const { user, accessToken, refreshToken } = data.data;
+
+                // Set auth in context
+                setAuth({ accessToken, refreshToken, userDetails: user });
+
+                // Store tokens and user details in cookies/localStorage
+                Cookies.set("accessToken", accessToken);
+                Cookies.set("refreshToken", refreshToken);
+                Cookies.set("userDetails", JSON.stringify(user));
+
+                navigate("/overview", { state: { toastMessage: "Successfully logged in!" } });
+            } catch (err) {
+                console.error(err);
+                navigate("/login", { state: { toastMessage: "Something went wrong. Try again." } });
+            }
+        };
+
+        performLogin();
+
+    }, [location.search, navigate, setAuth]);
+\end{lstlisting}
 
 \subsubsection{Main ResetPassword Page}
 
@@ -251,10 +325,20 @@ The authentication architecture provides secure user onboarding, identity verifi
 
 \vspace{0.2cm}
 \noindent\textbf{Props:}
-\begin{itemize}
-    \item \texttt{userContext} (Object) $\rightarrow$ Global auth context used to retrieve the user's email.
-    \item \texttt{Navigate} (Function) $\rightarrow$ React Router navigation function passed from parent.
-\end{itemize}
+\begin{table}[htbp]
+\centering
+\caption{ResetPasswordForm configuration properties}
+\label{tab:reset-parameters}
+\begin{tabular}{|p{4.5cm}|p{8.5cm}|}
+\hline
+\textbf{Property} & \textbf{Description} \\
+\hline
+\texttt{userContext} (Object) & Global auth context used to retrieve the user's email. \\
+\hline
+\texttt{Navigate} (Function) & React Router navigation function passed from parent. \\
+\hline
+\end{tabular}
+\end{table}
 
 \vspace{0.2cm}
 \noindent\textbf{Behavior:}

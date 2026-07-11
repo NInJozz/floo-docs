@@ -21,13 +21,12 @@ import { Job } from 'bullmq';
  
 export interface EventSource {
   start(body: Record<string, unknown>): Promise<Job>;
-  stop(): Promise<void>;
 }
 \end{lstlisting}
 
 This interface was intentionally kept minimal. The \texttt{start()} method receives the node configuration and returns a BullMQ Job handle, while \texttt{stop()} is responsible for cleanly cancelling whatever mechanism the trigger started. Any new trigger type only needs to implement these two methods, making the system open to extension without modifying existing code.
  
-Enforcing the same \texttt{start}/\texttt{stop} contract across all trigger types means the workflow runner can manage cron and poll triggers through a single loop, without any conditional branching based on type. Adding a new trigger type in the future requires no changes to the runner --- only a new class implementing \texttt{EventSource}.
+Enforcing the same \texttt{start} contract across all trigger types means the workflow runner can manage cron and poll triggers through a single loop, without any conditional branching based on type. Adding a new trigger type in the future requires no changes to the runner --- only a new class implementing \texttt{EventSource}.
 
 \paragraph{The Node Base Class}
 Trigger nodes are still Node subclasses, following the same abstract base class as all other node types in the system. What distinguishes a trigger node is the \texttt{triggerNode: true} flag in its static description object, along with a type of 'cron', 'poll', etc.

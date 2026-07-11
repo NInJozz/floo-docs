@@ -1,6 +1,6 @@
-\section{Trigger Nodes Mechanism}
+\subsection{Trigger Nodes Mechanism}
 
-\subsection{Overview}
+\subsubsection{Overview}
 In a workflow automation platform, every workflow must have an entry point — something that decides when execution begins. This role is fulfilled by trigger nodes. A trigger node is a specialized node that listens for a specific event or condition and, when that condition is met, fires the rest of the workflow graph for execution.
 Unlike regular action nodes that simply process inputs and pass outputs downstream, trigger nodes are always-on components that run persistently as long as a workflow is deployed. Each trigger type reacts to a different source of events. The platform supports the following trigger types:
 \begin{itemize}
@@ -12,8 +12,8 @@ Unlike regular action nodes that simply process inputs and pass outputs downstre
 
 The trigger mechanism is built around three key concerns: starting triggers when a workflow is deployed, reliably passing execution down the workflow graph when a trigger fires, and cleanly stopping all triggers when a workflow is stopped or the server shuts down.
 
-\subsection{Core Abstractions}
-\subsubsection{The EventSource Interface}
+\subsubsection{Core Abstractions}
+\paragraph{The EventSource Interface}
 All trigger types implement the \texttt{EventSource} interface, which defines a minimal two-method contract:
 \begin{lstlisting}
 // eventSource.ts
@@ -29,7 +29,7 @@ This interface was intentionally kept minimal. The \texttt{start()} method recei
  
 Enforcing the same \texttt{start}/\texttt{stop} contract across all trigger types means the workflow runner can manage cron and poll triggers through a single loop, without any conditional branching based on type. Adding a new trigger type in the future requires no changes to the runner --- only a new class implementing \texttt{EventSource}.
 
-\subsubsection{The Node Base Class}
+\paragraph{The Node Base Class}
 Trigger nodes are still Node subclasses, following the same abstract base class as all other node types in the system. What distinguishes a trigger node is the \texttt{triggerNode: true} flag in its static description object, along with a type of 'cron', 'poll', etc.
 
 \begin{lstlisting}

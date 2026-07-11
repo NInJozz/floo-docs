@@ -84,21 +84,7 @@ const job = await this.queue.upsertJobScheduler(
 The use of \texttt{upsertJobScheduler} rather than \texttt{add()} is deliberate: it is idempotent. If a scheduler with the same \texttt{jobId} already exists (e.g. after a server restart or a re-deploy), it is updated in place rather than creating a duplicate. The \texttt{jobId} follows the convention \texttt{cron-{projectId}-{nodeId}}, which makes it unique per node per project.
 
 \subsubsection{Stopping the Cron Trigger}
-Stopping the cron trigger is straightforward — the scheduler is removed by its ID:
-
-\begin{lstlisting}
-async stop() {
-  if (!this.jobId)
-    throw new AppError('No scheduler ID available', 500);
- 
-  const removed = await this.queue.removeJobScheduler(this.jobId);
- 
-  if (removed) console.log(`Stopped cron scheduler: ${this.jobId}`);
-  else         console.log(`No scheduler found: ${this.jobId}`);
-}
-\end{lstlisting}
-
-This permanently removes the repeating schedule from BullMQ's Redis store. Any jobs already in the queue from this scheduler may still execute, but no new ones will be added.
+Stopping the cron trigger is straightforward — the scheduler is removed by its identifier in \texttt{stopTriggerNodes} function in \texttt{workflow-runner} module. This permanently removes the repeating schedule from BullMQ's Redis store. Any jobs already in the queue from this scheduler may still execute, but no new ones will be added.
 
 
 \subsubsection{BullMQ over native timers}

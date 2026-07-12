@@ -1,0 +1,355 @@
+\section{Data Ingest Node}
+\label{sec:impl-data-ingest}
+
+\subsection{Purpose, Responsibilities, and Configuration}
+\label{subsec:data-ingest-overview}
+
+The Data Ingest node is the pipeline's single point of entry: it is the only node that touches the user's raw files, and every later node (Cleaning, Analyzer, Split, Preprocessing, Training, Evaluation) operates exclusively on the standardized \texttt{pandas.DataFrame} / Parquet artifact it produces. Its scope is deliberately narrow --- ingestion and structural normalization only. It does not clean, profile, or judge data quality; those concerns belong to later nodes.
+
+Its responsibilities are to (i) load a single source file, or merge multiple files from a folder, into one flat table; (ii) flatten nested JSON/JSONL structures; (iii) validate the result is non-empty; (iv) persist the dataset as Parquet together with a descriptive metadata artifact; and (v) register both artifact paths in the shared \texttt{manifest.json} so downstream nodes can locate them without knowing how they were produced.
+
+The node is driven entirely by \texttt{user\_config.json}, exposing two mutually exclusive modes: \textbf{file mode} (CSV, Excel, JSON, or JSONL, with format-specific options such as delimiter, sheet, and encoding) and \textbf{folder mode} (every file matching a filename prefix is merged, Section~\ref{subsec:data-ingest-mechanics}). Every failure mode is surfaced through a dedicated, typed exception (\texttt{ConfigError}, \texttt{SourceNotFoundError}, \texttt{EmptyDatasetError}, \texttt{FlattenLimitExceededError}, etc.) rather than a generic library exception, so an orchestrator can react to specific failure classes without parsing error strings --- a convention every node in this chapter follows.
+
+\subsection{Key Mechanics}
+\label{subsec:data-ingest-mechanics}
+
+CSV loading falls back through a prioritized encoding sequence (\texttt{utf-8}, \texttt{utf-8-sig}, \texttt{utf-16}, \texttt{cp1252}, \texttt{latin1}) when none is configured, logging a warning whenever a last-resort encoding is used. JSON/JSONL sources are flattened by \texttt{smart\_flatten}, which repeatedly explodes list columns and expands dict columns until no nesting remains, bounded by a pass limit so a pathological input fails explicitly rather than looping forever.
+
+In folder mode, files are combined by a heuristic join-and-concatenate strategy: for each pair of files, a shared column is accepted as a join key if it looks like an identifier by name or is unique by value (Listing~\ref{lst:ingest-key-heuristic}). Files with no discoverable shared key are concatenated instead, with the fallback logged. Every join is recorded (sources, key, key-set overlap ratio) in a merge-diagnostics block, giving auditable visibility into how a merged dataset was actually assembled.
+
+\begin{lstlisting}[language=Python, caption={Join-key eligibility heuristic evaluated independently on each candidate column.}, label={lst:ingest-key-heuristic}]
+def _is_valid_key(col: str, df: pd.DataFrame) -> bool:
+    col_lower = col.lower()
+    if col_lower.endswith("id") or "_id" in col_lower:
+        return True
+    return bool(df[col].is_unique)
+\end{lstlisting}
+
+\subsection{Outputs and Engineering Rationale}
+\label{subsec:data-ingest-outputs}
+
+The node writes two artifacts: the dataset itself (\texttt{<base\_name>.parquet}) and a metadata JSON (schema fingerprint, row/column counts, structural warnings, merge diagnostics where applicable). Both paths are registered in the manifest.
+
+Key decisions: (1) a declarative, stateless configuration keeps runs reproducible; (2) every operation whose termination depends on untrusted input shape (flattening, folder merging) is given an explicit ceiling; (3) the join heuristic knowingly trades strict correctness for the ability to always produce a single usable table, with the limitation documented rather than silently hidden.
+
+\section{Cleaning Node}
+\label{sec:impl-cleaning}
+
+\subsection{Purpose, Responsibilities, and Configuration}
+\label{subsec:cleaning-overview}
+
+The Cleaning node consumes Data Ingest's output and applies a fixed, deterministic eight-step sanitization pipeline (Table~\ref{tab:cleaning-steps-brief}), producing a consistently typed dataset for the Analyzer and Split nodes. Like Data Ingest, its input is resolved dynamically through the manifest rather than a configured path, decoupling it from whatever upstream source was actually used.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{c X}
+\toprule
+\textbf{\#} & \textbf{Step} \\
+\midrule
+1--2 & Normalize column names; drop fully-empty columns \\
+3 & Standardize missing-value tokens (e.g.\ \texttt{"N/A"}, \texttt{"--"}) to a uniform missing marker \\
+4--5 & Convert boolean-like, then numeric-like columns (in that order) \\
+6--8 & Drop fully-empty rows, duplicate rows, and duplicate columns \\
+\bottomrule
+\end{tabularx}
+\caption{The eight-step cleaning pipeline (fixed order).}
+\label{tab:cleaning-steps-brief}
+\end{table}
+
+\subsection{Key Mechanics}
+\label{subsec:cleaning-mechanics}
+
+Ordering is functionally significant: missing-token standardization precedes type conversion so tokens like \texttt{"N/A"} are recognized as missing rather than blocking numeric detection; boolean conversion precedes numeric conversion so tokens like \texttt{"1"}/\texttt{"0"} are not misclassified as numeric; duplicate detection runs last, after values are normalized and typed consistently.
+
+Both conversions are conservative rather than aggressive. Boolean conversion requires unanimous agreement across a column's distinct values. Numeric conversion is threshold-based (Listing~\ref{lst:cleaning-numeric-like}): a column converts only if at least a configurable proportion (default 0.90) of its values parse as numbers, with unparseable values becoming missing rather than blocking the whole column.
+
+\begin{lstlisting}[language=Python, caption={Threshold-based numeric-like test.}, label={lst:cleaning-numeric-like}]
+def _is_numeric_like(s: pd.Series, threshold: float) -> bool:
+    non_na = s.dropna()
+    if non_na.empty:
+        return False
+    ratio = pd.to_numeric(non_na, errors="coerce").notna().mean()
+    return ratio >= threshold
+\end{lstlisting}
+
+Duplicate-column detection uses a hash-then-verify approach: a fast hash narrows candidate pairs, which are then confirmed by an exact value-for-value comparison, avoiding a full pairwise scan while guaranteeing no false positives from hash collisions.
+
+\subsection{Outputs and Engineering Rationale}
+\label{subsec:cleaning-outputs}
+
+The node writes the cleaned dataset (\texttt{<base\_name>.parquet}) and an exhaustive JSON cleaning report --- per-step changes, dtype transitions, and summary statistics --- serving as the auditable record of every automatic modification made without human confirmation. The dataset is validated for non-emptiness both before and after cleaning, so a configuration that inadvertently empties the dataset fails explicitly rather than propagating a broken artifact downstream.
+
+\section{Profiling Report Node}
+\label{sec:impl-profiling}
+
+\subsection{Purpose, Responsibilities, and Configuration}
+\label{subsec:profiling-overview}
+
+Unlike the programmatic nodes around it, the Profiling Report node is a diagnostic, human-facing end product: a single self-contained HTML exploratory-data-analysis report, consumed by no other node. By default it profiles ``whatever the pipeline has produced most recently'' by walking the manifest's node list in reverse and selecting the first non-empty output, skipping its own prior runs (Listing~\ref{lst:profiling-last-node}). An explicit \texttt{input\_path} in configuration overrides this, allowing ad hoc profiling of a specific earlier artifact.
+
+\begin{lstlisting}[language=Python, caption={Reverse manifest walk locating the most recent upstream output.}, label={lst:profiling-last-node}]
+for node in reversed(manifest.get("nodes", [])):
+    name = str(node.get("name", "")).strip()
+    out  = str(node.get("output", "")).strip()
+    if not out or name == exclude_node:
+        continue
+    return name, out
+\end{lstlisting}
+
+Its responsibilities are limited to locating and loading the target dataset (any supported format), validating it is profilable, generating the report, and registering its path under \texttt{profiling\_report} in the manifest. It performs no cleaning, transformation, or judgment about findings --- report interpretation is left to a human or the Analyzer.
+
+\subsection{Outputs and Engineering Rationale}
+\label{subsec:profiling-outputs}
+
+Configuration (\texttt{report.title}, \texttt{report.minimal}, \texttt{report.explorative}) trades report depth against computation cost, defaulting to a lighter-weight report. Because the node is reusable at any point in the pipeline's development, this dynamic ``last node'' resolution --- rather than a fixed predecessor --- is the node's defining design choice, keeping it useful without reconfiguration as the pipeline evolves.
+
+\section{Analyzer Node}
+\label{sec:impl-analyzer}
+
+\subsection{Purpose and Responsibilities}
+\label{subsec:analyzer-overview}
+
+The Analyzer is the pipeline's planning stage: it consumes the cleaned dataset (falling back to Data Ingest's output) and produces a single \emph{analysis plan} --- the resolved task, a preprocessing plan, and a per-column feature manifest --- that lets Split, Preprocessing, and Training operate generically without re-deriving facts about the dataset. It never trains or evaluates a model.
+
+Two architectural boundaries define the node. First, it never infers user intent: target column, task mode (supervised/unsupervised), and unsupervised sub-task are always required as explicit configuration, never guessed --- earlier automatic-detection logic was removed after review, since a wrong guess here would silently misdirect every downstream node. Second, it distinguishes \emph{facts} (objective statistics), \emph{recommendations} (help some model families, not others), and \emph{decisions} (safe for every model family). Only decisions are applied unconditionally; categorical-encoding scheme, correlation-based dropping, and outlier clipping were all demoted from decisions to recommendations, since a fixed shared choice cannot simultaneously suit, e.g., a boosting model and a linear model.
+
+Responsibilities: resolve the input dataset and reconcile configured column names against the schema; compute a purely descriptive statistical profile (per-column stats and, when a target is set, target-association facts); validate the declared task strictly from configuration; select an evaluation metric, split strategy, and stratification decision; flag structurally unusable columns (constant, near-zero-variance, ID-like, high-missing) for unconditional removal (Listing~\ref{lst:analyzer-column-flags}); surface model-dependent facts as recommendations; run diagnostic-only leakage screening (keyword match, and two association-threshold tiers) without ever auto-dropping a column; and persist the combined plan as a single JSON artifact.
+
+\begin{lstlisting}[language=Python, caption={Structural drop reasons assembled from the profiler's derived lists.}, label={lst:analyzer-column-flags}]
+drop_reasons: Dict[str, List[str]] = {
+    "constant": sorted(set(constant_cols)),
+    "near_zero_variance": sorted(
+        c for c in set(nzv_cols) if c not in set(constant_cols)),
+    "id_like": sorted(set(id_like_cols)),
+    "high_missing": drop_missing_cols,
+}
+\end{lstlisting}
+
+\subsection{Outputs and Engineering Rationale}
+\label{subsec:analyzer-outputs}
+
+\texttt{analysis\_plan.json} carries three sections --- \texttt{analysis\_plan} (resolved task, metric, diagnostics, reasoning trace), \texttt{preprocessing\_plan} (structural drops, per-group imputation strategy, correlation/outlier facts), and \texttt{feature\_manifest} (per-column role and drop reason) --- plus a \texttt{schema\_version} tracked independently of the node's own version, since the artifact is a contract consumed by three downstream nodes. A verbatim copy of the exact input file analyzed is persisted alongside it for traceability. Column-name reconciliation uses only exact and case/whitespace-insensitive matching, deliberately stopping short of fuzzy matching so a resolved name is always traceable to an unambiguous rule (Listing~\ref{lst:analyzer-schema-reconcile}).
+
+\begin{lstlisting}[language=Python, caption={Exact match tried first, falling back to case/whitespace-insensitive matching.}, label={lst:analyzer-schema-reconcile}]
+if requested in actual_columns:
+    resolved.append(requested)
+    continue
+match = actual_lookup.get(requested.strip().lower())
+if match is not None:
+    resolved.append(match)
+else:
+    resolved.append(requested)  # unresolved -> existing error path fires
+\end{lstlisting}
+
+\section{Split Node}
+\label{sec:impl-split}
+
+\subsection{Purpose, Responsibilities, and Configuration}
+\label{subsec:split-overview}
+
+The Split node is a strictly subordinate execution stage: every modeling decision --- task type, target column, split strategy, whether to stratify --- is read verbatim from the Analyzer's plan with no defaults; a missing field is a hard error. Its own \texttt{user\_config.json} is restricted to \emph{mechanics} only (proportions, random seed, shuffling, time/group column identity), and any attempt to smuggle a modeling decision in through this file is detected and explicitly ignored. It loads the exact dataset file the Analyzer itself analyzed, guaranteeing the split data matches the data the Analyzer's decisions were computed against, and produces the row-disjoint train/validation/test partitions consumed by Preprocessing, Training, and Evaluation.
+
+\subsection{Split Strategies and Validation}
+\label{subsec:split-strategies}
+
+Three mutually exclusive strategies are supported: \textbf{random} (optionally stratified on the target, with an explicit fallback note if stratification is requested but not mechanically possible); \textbf{time-based} (sorted on a required time column, most-recent portion to test, shuffling forced off); and \textbf{group-based} (a grouped shuffle-split applied twice so no group's rows cross a partition boundary). The strategy used defaults to the Analyzer's recommendation (currently always \texttt{"random"}) unless explicitly overridden in configuration.
+
+Validation runs both before splitting (sufficient rows for the requested proportions; every classification target class has at least two samples) and after (every partition non-empty is a hard failure condition; an unusually small partition is only a warning). Null-target rows are removed once, before any strategy runs, so every strategy sees the same prepared input.
+
+\subsection{Outputs and Engineering Rationale}
+\label{subsec:split-outputs}
+
+Outputs are \texttt{train.parquet} / \texttt{val.parquet} / \texttt{test.parquet}, a copy of the Analyzer's plan, and \texttt{split\_metadata.json} recording the strategy used, the stratification outcome (and why, if it could not be applied), row counts, and per-partition class distribution. The node's guiding principle is that it \emph{executes} the Analyzer's decisions rather than re-deciding them, keeping the Analyzer/Split ownership boundary explicit and auditable.
+
+\section{Preprocessing Node}
+\label{sec:impl-preprocessing}
+
+\subsection{Purpose, Responsibilities, and Configuration}
+\label{subsec:preprocessing-overview}
+
+The Preprocessing node mechanically executes the Analyzer's \texttt{preprocessing\_plan} to turn the split partitions into a fully numeric, model-agnostic feature representation for Training. Like Split, it is an execution stage: what to do to a column is always read from the Analyzer's plan, never invented internally, and a missing required directive is a hard error rather than a silently substituted default.
+
+A second defining property is strict fit/transform discipline: every data-dependent decision (does a column convert to numeric; which date-parsing strategy fits it; is a column too sparse to impute) is decided exactly once from the training partition during \texttt{fit()}, then applied identically to validation and test during \texttt{transform()} --- preventing train/validation/test skew (Listing~\ref{lst:preprocessing-fit-transform}). Its own configuration (\texttt{preprocessing/user\_config.json}) is deliberately minimal, since nearly every substantive choice already comes from the Analyzer.
+
+\begin{lstlisting}[language=Python, caption={A numeric-conversion decision made once in \texttt{fit()}, only ever applied in \texttt{transform()}.}, label={lst:preprocessing-fit-transform}]
+# fit(): decide, once, whether this column converts
+if success_ratio >= self.conversion_threshold:
+    decisions[col] = {"action": "convert", "mode": mode,
+                       "success_ratio": success_ratio}
+self.conversion_decisions_ = decisions
+
+# transform(): only ever apply the fitted decision
+decision = self.conversion_decisions_.get(col)
+if decision and decision["action"] == "convert":
+    X[col] = pd.to_numeric(X[col], errors="coerce")
+\end{lstlisting}
+
+\subsection{The Preprocessing Pipeline}
+\label{subsec:preprocessing-pipeline}
+
+A fixed, ordered \texttt{scikit-learn} pipeline is built directly from the Analyzer's plan: (1) drop structurally-flagged columns; (2) convert declared-numeric columns; (3) normalize pandas-native missing markers to \texttt{np.nan}; (4) parse and normalize datetime columns; (5) clean text columns (Unicode form, case, HTML/URL/email stripping); (6) derive calendar features from datetime columns and drop the originals; (7) re-normalize missing markers, since step 6 can reintroduce them; (8) impute missing values per the Analyzer's declared strategy --- always last, since every earlier step can itself introduce new missing values, an ordering constraint enforced by an explicit internal check. A column entirely missing in the training data is dropped once, from training data, and that same drop applied to every partition (Listing~\ref{lst:preprocessing-drop-missing}).
+
+\begin{lstlisting}[language=Python, caption={A training-only missingness decision, applied identically to every partition.}, label={lst:preprocessing-drop-missing}]
+if len(non_null) == 0:              # decided once, from training data
+    self.columns_to_drop_.append(col)
+    continue
+...
+drop_now = [c for c in self.columns_to_drop_ if c in X.columns]
+X = X.drop(columns=drop_now)        # applied to train, val, and test alike
+\end{lstlisting}
+
+Target separation is unconditional across every task type (closing a leakage path present in an earlier version), while extraction of a usable target array is scoped only to task types the node explicitly supports.
+
+\subsection{Outputs and Engineering Rationale}
+\label{subsec:preprocessing-outputs}
+
+Outputs are the feature matrices (\texttt{X\_train/val/test.parquet}), target arrays (\texttt{y\_*.npy}, where applicable), the fitted pipeline (\texttt{preprocess\_pipeline.joblib}), and a self-describing \texttt{feature\_schema.json} that embeds a verbatim copy of the Analyzer's plans alongside the node's own column groupings and per-transformer reports --- letting Training reconstruct the full decision chain from a single file. Transformer reports are snapshotted immediately after the training partition is transformed, before validation/test are processed, since the reports are mutable state that would otherwise be overwritten (Listing~\ref{lst:preprocessing-snapshot}). The output format (dense Parquet) is a fixed, deliberate cross-node commitment rather than a per-run configuration switch.
+
+\begin{lstlisting}[language=Python, caption={Snapshotting each transformer's report immediately after the training partition is transformed.}, label={lst:preprocessing-snapshot}]
+Xtr = pipe.transform(X_train)
+train_date_report = dict(pipe.named_steps["date_normalize"].report_)
+train_missing_value_report = dict(pipe.named_steps["missing_values"].report_)
+
+Xva = pipe.transform(X_val)   # report_ is now overwritten; already captured
+Xte = pipe.transform(X_test)
+\end{lstlisting}
+
+\section{Training Node}
+\label{sec:impl-training}
+
+\subsection{Purpose and Architectural Overview}
+\label{subsec:training-overview}
+
+Training is the pipeline's most complex node: it fits a diverse set of candidate models against a wall-clock time budget, producing a registry for Evaluation to score. Every preprocessing choice the Analyzer demoted to a recommendation --- encoding scheme, outlier clipping, scaling --- is resolved here, per model family, rather than applied uniformly. It never computes a performance metric or selects a ``best'' model; that is Evaluation's job.
+
+The node decomposes internally into eleven single-concern components coordinated by a Controller (Table~\ref{tab:training-components-brief}), a discipline arrived at after an architecture review consolidated several duplicated decisions (most notably budget-pressure classification, which an earlier draft computed independently in two places) into a single owner (Listing~\ref{lst:training-budget-pressure}).
+
+\begin{lstlisting}[language=Python, caption={Budget-pressure classification: computed once, by the Scheduler, and consumed everywhere else.}, label={lst:training-budget-pressure}]
+def classify_budget_pressure(self, tbm: TimeBudgetManager) -> BudgetPressure:
+    ratio = max(tbm.remaining, 0.0) / tbm.total
+    if ratio >= _LOW_PRESSURE_MIN_RATIO:
+        return BudgetPressure.LOW
+    if ratio >= _MEDIUM_PRESSURE_MIN_RATIO:
+        return BudgetPressure.MEDIUM
+    return BudgetPressure.HIGH
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{Component} & \textbf{Responsibility} \\
+\midrule
+Model Catalog & Static metadata: task compatibility, structural constraints, preprocessing requirements, reducible-parameter tiers. \\
+Model Selector & Filters the Catalog to models structurally eligible for this task, dataset, and preset. \\
+Scheduler + Time Budget Manager & Orders candidates cheap-first, estimates cost, classifies budget pressure, and performs admission control against a wall-clock ledger. \\
+Complexity Reducer & Maps budget pressure onto a reduced parameter value for models without native time-budget support. \\
+Feature Adapter & The sole component performing model-specific transformation (encoding, scaling, outlier handling), fitted once per distinct requirement set. \\
+Fit Runner & Executes one model's fit call inside a fault boundary; returns success/failure/timeout only, never a metric. \\
+Registry Builder / Artifact Writer & Structural decisions vs.\ pure file I/O, kept separate for testability. \\
+\bottomrule
+\end{tabularx}
+\caption{Internal components of the Training node (condensed).}
+\label{tab:training-components-brief}
+\end{table}
+
+\subsection{Key Mechanics}
+\label{subsec:training-mechanics}
+
+Native-budget model families (LightGBM, XGBoost, CatBoost) expose a genuine wall-clock training callback, so the Controller routes them directly to the Fit Runner. Every other iterative model is first routed through the Complexity Reducer, a pure function from \texttt{(model\_name, budget\_pressure)} to a reduced parameter value drawn from a fixed, per-model tier table (e.g.\ random forest's \texttt{n\_estimators} at 300/100/50 across full/medium/minimal pressure). This native-vs-reduced routing is the Controller's one genuine architectural decision; every other decision belongs to exactly one component (Listing~\ref{lst:training-routing}).
+
+\begin{lstlisting}[language=Python, caption={The Controller's sole routing decision (Patch 1): native budget vs.\ Complexity Reducer.}, label={lst:training-routing}]
+if catalog_entry.supports_native_budget:
+    adjusted_params: dict = {}
+    is_native_budget = True
+else:
+    reduction = self._complexity_reducer.reduce(
+        candidate.model_name, budget_pressure_for_fit)
+    adjusted_params = reduction.adjusted_params
+    is_native_budget = False
+\end{lstlisting}
+
+The Feature Adapter applies exactly the transformations a candidate's declarative requirements imply (outlier clipping, categorical encoding, text vectorization, scaling), fit on training features only, and caches fitted transformers by requirement-set signature so candidates sharing a requirement set are never refit. The Fit Runner never lets an exception escape a fit call, reports only structural facts (fit time, iterations, convergence), and, as a best-effort backstop beneath every model, runs the fit call on a background thread joined against the remaining budget plus a grace period.
+
+Persistence is incremental: each model, its completion marker, and (on a cache miss) its transformer are written to disk immediately after that candidate finishes, bounding the cost of a mid-run crash to the one candidate in progress.
+
+\subsection{Outputs and Engineering Rationale}
+\label{subsec:training-outputs}
+
+Outputs are one serialized model per successful candidate, shared feature-transformer artifacts, \texttt{model\_registry.json} (the single source of truth per run: status, fit time, artifact size, error message per candidate), and run-level summary/log files. The registry's \texttt{supports\_held\_out\_inference} field is copied from the Catalog and is false only for DBSCAN and Agglomerative Clustering, whose implementations expose no \texttt{predict} method --- carried through purely so Evaluation knows not to attempt held-out scoring for them (Listing~\ref{lst:training-registry-entry}).
+
+\begin{lstlisting}[language=Python, caption={\texttt{supports\_held\_out\_inference} defaults to \texttt{True} on build, then is copied verbatim from the Catalog.}, label={lst:training-registry-entry}]
+# RegistryEntry: unset until finalized
+supports_held_out_inference: bool = True
+...
+# Controller, after Fit Runner returns:
+entry = registry_builder.finalize_with_inference_support(
+    entry, catalog_entry.supports_held_out_inference)
+\end{lstlisting}
+
+\section{Evaluation Node}
+\label{sec:impl-evaluation}
+
+\subsection{Purpose and Architectural Overview}
+\label{subsec:evaluation-overview}
+
+Evaluation is the terminal node: it scores, diagnoses, and interprets every model Training successfully fitted, producing a ranked leaderboard and a consolidated registry. Where Training negotiates a shared time budget, Evaluation has none --- every model is dispatched independently and in parallel, and a uniform per-model fault boundary (catch, log, return a well-defined absence) ensures one model's failure never blocks another's (Listing~\ref{lst:evaluation-fault-boundary}).
+
+\begin{lstlisting}[language=Python, caption={The uniform per-model fault boundary, as implemented in Prediction Engine.}, label={lst:evaluation-fault-boundary}]
+def _safe_predict(self, model_name, model):
+    try:
+        return self._predict_model(model_name, model)
+    except Exception as exc:
+        print(f"Model : {model_name}")
+        traceback.print_exc()
+        return None  # well-defined absence; never blocks the rest
+\end{lstlisting} Its internal vocabulary --- Prediction, Metrics, Diagnostics, and Feature Importance Engines, plus Leaderboard Builder, Registry Builder, Artifact Writer, and Controller --- deliberately mirrors Training's own decomposition.
+
+\subsection{The Four Engines}
+\label{subsec:evaluation-engines}
+
+The \textbf{Prediction Engine} re-applies each model's own feature transformer before calling \texttt{predict}, allowing one run to score models fitted against entirely different feature representations without special-casing. For classifiers exposing no native \texttt{predict\_proba}, it derives probabilities from \texttt{decision\_function} (sigmoid for binary, softmax for multiclass), giving every downstream probability-dependent metric a uniform input (Listing~\ref{lst:evaluation-proba-fallback}).
+
+\begin{lstlisting}[language=Python, caption={Probability fallback from \texttt{decision\_function}: sigmoid for binary, softmax for multiclass.}, label={lst:evaluation-proba-fallback}]
+if scores.ndim == 1:                                    # binary
+    probs = 1.0 / (1.0 + np.exp(-scores))
+    return np.column_stack([1.0 - probs, probs])
+scores = scores - np.max(scores, axis=1, keepdims=True)  # multiclass
+exp_scores = np.exp(scores)
+return exp_scores / exp_scores.sum(axis=1, keepdims=True)
+\end{lstlisting}
+
+The \textbf{Metrics Engine} computes a task-dispatched set of metrics (Table~\ref{tab:eval-metrics-brief}), wrapping each individual metric in its own exception handler so one uncomputable metric never blocks the rest. The primary ranking metric defaults, per task type, to F1 / RMSE / silhouette / average precision, with a fixed table resolving maximize-vs-minimize direction consistently between the Metrics Engine and the Leaderboard Builder.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{Task type} & \textbf{Representative metrics} \\
+\midrule
+Classification & Accuracy, F1, MCC, ROC AUC, log loss (where probabilities available) \\
+Regression & MAE, RMSE, $R^2$, max error \\
+Clustering & Silhouette, Calinski--Harabasz, Davies--Bouldin; ARI/NMI where labels exist \\
+Anomaly detection & Precision, recall, F1, ROC AUC where labels exist \\
+\bottomrule
+\end{tabularx}
+\caption{Metrics computed by the Metrics Engine (condensed).}
+\label{tab:eval-metrics-brief}
+\end{table}
+
+The \textbf{Diagnostics Engine} produces raw numeric data only (confusion matrices, residuals, cluster composition, anomaly-score distributions) and renders no plots, leaving visualization to the presentation layer. The \textbf{Feature Importance Engine} attempts the cheapest available method first --- native \texttt{feature\_importances\_}, then \texttt{coef\_}, then permutation importance as a fully model-agnostic fallback --- reserving the expensive method for models exposing neither native alternative.
+
+\subsection{Outputs and Engineering Rationale}
+\label{subsec:evaluation-outputs}
+
+Because every model's evaluation is complete in memory before any artifact is written, Evaluation persists each artifact type once as a single aggregate JSON document (\texttt{predictions.json}, \texttt{metrics.json}, \texttt{diagnostics.json}, \texttt{importance.json}) rather than incrementally per model, in deliberate contrast to Training's crash-resilient design. \texttt{leaderboard.json} and \texttt{registry.json} consolidate the ranked results and one structural entry per model, and a final \texttt{evaluation\_summary.json} --- assembled strictly last, once every other artifact's path is known --- records the primary metric, best model, and every artifact path produced by the run (Listing~\ref{lst:evaluation-summary-order}).
+
+\begin{lstlisting}[language=Python, caption={The summary is populated with artifact paths only after \texttt{write\_all} has produced them, then written last.}, label={lst:evaluation-summary-order}]
+outputs = writer.write_all(prediction_report=prediction_report,
+    metrics_report=metrics_report, diagnostics=diagnostics,
+    importance_records=importance_records, registry=registry,
+    leaderboard=leaderboard, summary=summary)
+summary.registry_path = outputs.get("registry", "")
+summary.leaderboard_path = outputs.get("leaderboard", "")
+outputs["summary"] = writer.write_summary(summary)
+\end{lstlisting} As the pipeline's terminal node, this output is intended for direct human review rather than any further pipeline stage.

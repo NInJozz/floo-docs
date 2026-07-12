@@ -1,0 +1,677 @@
+\subsection{Overview Page}
+\label{sec:overview-page}
+ 
+The Overview Page is the main dashboard of the automation platform and the first page users see after logging in. It acts as a central workspace where users can manage the different parts of the system without having to switch between multiple pages. Since users spend most of their time interacting with workflows and monitoring automation processes, the Overview Page was designed to make these tasks as simple and organized as possible, providing users with an immediate overview of their automation environment, including active workflows, execution history, credentials, and key statistics.
+ 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/overview-page/overview_1.png}
+    \caption{The Overview Page dashboard, showing the navigation bar,
+execution analysis cards, and execution status chart.}
+    \label{fig:overview-nav}
+\end{figure}
+ 
+\subsubsection{OverviewNav Component}
+\label{sec:overviewnav}
+ 
+\paragraph{Purpose}
+This component is the main navigation bar at the top of the dashboard. It
+shows the logo, switches between light and dark modes, lets admins access
+special settings, and shows the user's profile icon. It also blocks
+unverified users from clicking links they should not access yet.
+ 
+\paragraph{Location}
+\texttt{src/components/OverviewNav.jsx}
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{firstName} (String): The user's first name, used to
+    create the profile icon's initials.
+    \item \texttt{lastName} (String): The user's last name, also used for
+    the initials.
+    \item \texttt{isVerified} (Boolean): Verification status flag that
+    explicitly locks or unlocks general navigation pathways.
+\end{itemize}
+ 
+\paragraph{Internal Sub-Components}
+\begin{itemize}
+    \item \textbf{NavIconBtn}: A helper component that acts as either a
+    clickable button or a page link. If a user is not verified, this
+    component stops them from clicking through by blocking the action.
+    \item \textbf{Avatar}: A styled link component pointing to
+    \texttt{/user-profile} that safely extracts, merges, and displays the
+    uppercase first letters of the user's first and last names.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{enumerate}
+    \item \textbf{Shows Admin Controls}: It checks the user's account
+    details. If the user is logged in as an admin, it automatically reveals
+    an extra lock icon (\texttt{bi-shield-lock}) that links to the admin
+    user management screen.
+    \item \textbf{Theme Switcher}: It holds the theme toggle button
+    (\texttt{<ModeSwitch/>}) on the right side so users can change the look
+    of the dashboard whenever they want.
+\end{enumerate}
+ 
+\paragraph{Layout \& Styling Notes}
+\begin{itemize}
+    \item \textbf{Visual Polish}: Uses a modern, semi-transparent
+    ``glass'' effect that blurs the background slightly.
+    \item \textbf{Responsive Control Rules}: On smaller screens and mobile
+    phones, the layout automatically shrinks. It reduces padding, tightens
+    the gaps between icons, scales down the logo, and makes the profile
+    avatar smaller so everything fits neatly without clutter.
+\end{itemize}
+ 
+ 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{MetricsSection Component}
+\label{sec:metricssection}
+ 
+\paragraph{Purpose}
+This component gives users a quick, clear look at how their workflows have
+performed over the last seven days. It displays a row of four distinct
+summary cards -- Total, Failed, and Successful executions, alongside an
+overall Success Rate -- followed by a visual trend chart.
+ 
+\begin{lstlisting}[language=TypeScript]
+<Row className="metrics-row">
+  {METRICS_CONFIG.map((config, index) => {
+    const { key, ...metricProps } = config;
+ 
+    return (
+      <Col key={key} md={6} lg={3} className="mb-3">
+        <MetricCard
+          {...metricProps}
+          index={index}
+          isLoading={isLoading}
+          onMetricClick={onMetricClick}
+          value={
+            analytics?.[key] != null
+              ? metricProps.format(analytics[key])
+              : "--"
+          }
+        />
+      </Col>
+    );
+  })}
+</Row>
+\end{lstlisting}
+ 
+\paragraph{Location}
+\texttt{src/components/MetricsSection.jsx}
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{setAuth} (Function): Updates user login or profile
+    details if something expires or errors out during background data
+    collection.
+    \item \texttt{onMetricClick} (Function): A callback that triggers when
+    a user clicks on a card. It takes them directly to a pre-filtered list
+    of executions (for example, showing only failed runs).
+    \item \texttt{onAnalyticsLoaded} (Function): An optional helper that
+    sends the freshly fetched data back up to parent components that might
+    need it.
+\end{itemize}
+ 
+\paragraph{Internal Components}
+\begin{itemize}
+    \item \textbf{MetricCard}: The individual card layout for each metric.
+    It manages its own loading spinners, entry animations, text styling,
+    and an animated count-up effect when numbers load.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{enumerate}
+    \item \textbf{Automatic Data Fetching}: As soon as the component
+    appears on screen, it automatically contacts
+    \texttt{ExecutionService.getAnalytics} to grab data from the past week.
+    \item \textbf{Staggered Card Entry}: Each card waits for a brief,
+    incremental delay before fading into view. This prevents everything
+    from popping in abruptly.
+    \item \textbf{The Count-Up Animation}: When the data finishes loading,
+    numbers do not just snap into place. Instead, a built-in timer splits
+    the target value into 30 small chunks, rolling the counter up over a
+    smooth 900-millisecond window. It also preserves percentage symbols or
+    text suffixes.
+    \item \textbf{Interactive Filtering}: Cards that handle status filters
+    (like ``Failed'' or ``Success'') become interactive. Hovering over
+    them reveals a pointer cursor, and clicking them updates the
+    application's view state to display those specific execution records.
+\end{enumerate}
+ 
+ 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{CreateWorkflow Component}
+\label{sec:createworkflow}
+ 
+\paragraph{Purpose}
+This component handles creating a brand-new automation project. It starts
+with a simple ``Create Workflow'' button on the dashboard. Clicking it
+pops up a centered modal window containing a structured input form. The
+form safely processes project metadata and sends it to the server,
+creating the project without refreshing the page.
+ 
+\paragraph{Location}
+\texttt{src/pages/Overview/components/CreateWorkflow.jsx} 
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{onWorkflowCreated} (Function): A callback that fires
+    right after the server successfully builds the workflow. It passes the
+    newly created workflow data upward so the dashboard can instantly
+    update or redirect the user.
+    \item \texttt{onClose} (Function): Dismisses and hides the popup modal
+    when a user clicks ``Cancel,'' hits the top-right close icon, or
+    clicks outside the window.
+\end{itemize}
+ 
+\paragraph{Internal Components}
+\begin{itemize}
+    \item \textbf{WorkflowForm}: Renders the actual input fields,
+    textareas, and select menus inside the popup body. Separating the
+    layout fields keeps this file clean and easy to read.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{enumerate}
+    \item \textbf{Verification and Loading Lockout}: The dashboard
+    ``Create Workflow'' button is locked down (disabled) if the system is
+    actively fetching background data or if the user has not verified
+    their email.
+    \item \textbf{State Management}: The form starts with reasonable
+    defaults: an empty text box for the name, a blank optional description
+    field, the workflow type set to ``Personal,'' and a baseline version
+    number of 1.
+    \item \textbf{Payload Verification}: When a user clicks ``Create
+    Workflow,'' the submission handler trims down whitespace inside the
+    optional description text. If the user left it blank, the code leaves
+    the description field completely out of the API payload rather than
+    sending blank text.
+    \item \textbf{Graceful API Handshakes \& Error Management}: The form
+    communicates directly with \texttt{WorkflowService.createWorkflow}. If
+    the server hits a snag, the error is caught, and a red alert box drops
+    down smoothly right above the form fields. If it succeeds, the new
+    workflow data is saved, and the window closes immediately.
+    \item \textbf{Double-Click Prevention}: While the API call runs,
+    \texttt{isSubmitting} turns true. This instantly disables both the
+    ``Cancel'' and ``Create Workflow'' buttons and replaces the submission
+    text with a spinning loading wheel to stop accidental double
+    submissions.
+ 
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/overview-page/create-workflow-form.png}
+    \caption{The Create Workflow modal, prompting for the workflow name, description, type, and version.}
+    \label{fig:create-workflow-modal}
+\end{figure}
+ 
+\end{enumerate}
+ 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{ExecutionChart Component}
+\label{sec:executionchart}
+ 
+\paragraph{Purpose}
+Provides a visual representation of workflow execution outcomes over the
+last seven days. The chart helps users understand the overall distribution
+of execution results, with each status represented by a distinct color.
+This makes it easy for users to distinguish between different execution
+outcomes and understand their distribution.
+ 
+\paragraph{Location}
+\texttt{src/components/ExecutionChart.jsx}
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{analytics} (Object): The data object from the server. It
+    must contain a \texttt{statusBreakdown} object tracking execution
+    states like \texttt{SUCCESS}, \texttt{ERROR}, \texttt{CANCELLED},
+    \texttt{CRASHED}, and \texttt{RUNNING}.
+\end{itemize}
+ 
+\paragraph{Internal Components}
+This component is self-contained and uses native SVG elements
+(\texttt{<svg>}, \texttt{<circle>}, \texttt{<text>}) to build the chart
+dynamically.
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{enumerate}
+    \item \textbf{Safety Checks}: The component checks for valid data. If
+    \texttt{analytics.statusBreakdown} is missing, or if all values add up
+    to 0, it renders nothing (\texttt{null}) to avoid showing an empty
+    chart.
+    \item \textbf{Filtering Zero Values}: It filters out status categories
+    with a count of 0. This ensures only active statuses appear in the
+    legend and the SVG loop.
+    \item \textbf{Dynamic Text}: The component calculates the total number
+    of executions and places that number, along with the word ``total,''
+    right in the middle of the donut ring.
+\end{enumerate}
+ 
+ \subsubsection{Tabs Layout and Subcomponents}
+\label{sec:tabs-layout}
+ 
+The dashboard utilizes a tabbed navigation bar (\texttt{content-tabs}) to
+cleanly separate core assets into three dedicated sections:
+Workflows, Credentials, and Executions. Each tab acts as a standalone
+view.
+ 
+\paragraph{Workflows Tab}\mbox{}\\
+\label{sec:workflows-tab}
+The Workflows tab displays all of the user's automation workflows in a
+searchable, paginated list, with quick access to open, export,
+duplicate, or delete each one.
+ 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/overview-page/workflows-tab.png}
+    \caption{The Workflows tab, showing the workflow list with the action menu open for a selected workflow.}
+    \label{fig:workflows-tab}
+\end{figure}
+\paragraph{WorkflowList Component}
+ 
+\paragraph{Purpose}
+Serves as the main interface for managing the user's automation workflows. It provides search functionality to filter workflows, organizes them into paginated lists, allows users to open a selected workflow, and keeps the interface updated when workflows are deleted.
+ 
+\paragraph{Location}
+\texttt{src/components/WorkflowList.jsx}
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{workflows} (Array): The raw list of workflow objects
+    fetched from the database.
+    \item \texttt{onWorkflowDeleted} (Function): Callback fired to notify
+    parent components when a workflow is successfully removed.
+    \item \texttt{refetch} (Function): Triggers a global data reload to
+    refresh the dashboard state.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{itemize}
+    \item \textbf{State Syncing}: Uses a \texttt{useEffect} hook to watch
+    the \texttt{initialWorkflows} prop. Whenever the parent data changes,
+    it updates the local \texttt{workflows} state and resets the page
+    view back to 1.
+    \item \textbf{Case-Insensitive Filtering}: Monitors the search text
+    input. It filters the array by verifying if the workflow name
+    contains the query substring, forcing both values to lowercase to
+    guarantee accurate matching.
+    \item \textbf{Strict Pagination Bounds}: Slices the filtered array
+    into matching segments using a fixed limit of 5 items per page
+    (\texttt{PAGE\_SIZE = 4}). Changing or clearing the search text
+    automatically snaps the pagination tracker back to page 1 to prevent
+    out-of-bounds rendering.
+    \item \textbf{Menu Stacking Coordination}: Tracks the currently open
+    action menu by ID (\texttt{openMenuId}). When a specific card's
+    dropdown opens, it assigns a specialized \texttt{.dropdown-open}
+    class to that item container.
+\end{itemize}
+ 
+\paragraph{WorkflowActions Component}
+ 
+\paragraph{Purpose}
+Manages a dedicated operations menu for each workflow card, handling
+actions like routing configuration transitions, duplicate cloning,
+backend data removal, and triggering the structural export popup modal.
+ 
+\paragraph{Location}
+Declared inline or as a sub-module alongside \texttt{WorkflowList.jsx}
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{workflow} (Object): The comprehensive metadata object
+    for the target automation item.
+    \item \texttt{setAuth} (Function): State function used to inject
+    fresh bearer authorization headers into remote service requests.
+    \item \texttt{onDelete} (Function): Dispatches an alert upward to
+    remove the workflow from the UI state after server deletion.
+    \item \texttt{onOpen} (Function): Triggers navigation routing to
+    launch the graph workspace editor.
+    \item \texttt{refetch} (Function): Reloads the project directory
+    dataset from the backend database.
+    \item \texttt{isOpen} (Boolean): Explicit flag reflecting whether
+    this specific action dropdown is visible.
+    \item \texttt{onToggle} (Function): Communicates menu visibility
+    adjustments back to the parent state tracker.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{itemize}
+    \item \textbf{Event Bubble Isolation}: Intercepts click gestures
+    across all menu triggers using \texttt{e.stopPropagation()}. This
+    blocks event cascading, preventing choices inside the options menu
+    from launching the parent card's workspace link.
+    \item \textbf{Export Pipeline \& Modality Integration}: When clicking
+    ``Export,'' the component invokes the asynchronous
+    \texttt{exportWorkflow} function. It disables the option during
+    loading, hides the context dropdown, generates an
+    operating-system-safe filename via a string cleaner utility
+    (\texttt{slugifyFilename}), and populates the \texttt{exportModal}
+    state configuration (\texttt{show: true, data, filename}) to display
+    the integrated \texttt{<JsonPopup/>} overlay window.
+    \item \textbf{JSON Popup Mechanics}: The rendering component passes the required state handlers to the embedded \texttt{<JsonPopup/>} modal. The modal supports downloading and copying JSON data, and displays it in an interactive tree view using \texttt{<JsonTreeView/>}.
+\end{itemize}
+ 
+ \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{images/overview-page/json-popup.png}
+    \caption{The JSON export popup, showing the workflow structure with download and copy options.}
+    \label{fig:json-export-popup}
+\end{figure}
+ 
+\begin{itemize}
+    \item \textbf{Cloning Mechanics}: Pulls down full pipeline
+    definitions using the export function. It deeply duplicates the
+    object layout, merges names, structures descriptions, and sends a
+    POST request to \texttt{/api/project/import}. It wraps up by firing
+    \texttt{refetch()} to refresh the dashboard UI.
+    \item \textbf{Automatic Focus Cleanup}: Registers a document click
+    listener inside a \texttt{useEffect} loop while the menu is open. If
+    a user clicks outside the menu area, it captures the interaction and
+    clears the open status.
+\end{itemize}
+ 
+\paragraph{NoWorkflows Component}
+ 
+\paragraph{Purpose}
+Provides a clean placeholder screen when a user's directory contains no
+automation blueprints, offering a clear onboarding flow to guide them
+through creating their first workflow.
+ 
+\paragraph{Location}
+\texttt{src/components/NoWorkflows.jsx} 
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{onAddWorkflow} (Function): Callback action triggered
+    when a user clicks the visual creation card.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{itemize}
+    \item \textbf{Onboarding Interactions}: Implements a direct click
+    capture on the central card container. Clicking anywhere on the card
+    fires the \texttt{onAddWorkflow} prop callback to open creation
+    wizards or modal forms.
+\end{itemize}
+ 
+\paragraph{Credentials Tab}\mbox{}\\
+\label{sec:credentials-tab}
+The Credentials tab displays all of the user's saved credentials in a
+searchable, filterable table, with the ability to add, edit, or delete
+credentials without leaving the dashboard.
+ 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/overview-page/credentials-tab.png}
+    \caption{The Credentials tab, showing the searchable, filterable credentials table with masked key previews.}
+    \label{fig:credentials-tab}
+\end{figure}
+ 
+\paragraph{CredentialsList Component}
+ 
+\paragraph{Purpose}
+Serves as the main interface for managing the user's saved credentials.
+It allows users to search and filter credentials by type, view key
+information in a structured table, and create, edit, or delete
+credentials without leaving the dashboard.
+ 
+\paragraph{Location}
+\texttt{src/components/CredentialsList.jsx}
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{setAuth} (Function): Updates the user's authentication
+    state if a request requires refreshing login credentials or handling
+    authorization errors.
+\end{itemize}
+ 
+\paragraph{Internal Components}
+\begin{itemize}
+    \item \textbf{AddCredential}: A drawer-based form used to create new
+    credentials or edit existing ones. It receives the selected
+    credential data and handles saving changes.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{enumerate}
+    \item \textbf{Automatic Data Loading}: The component retrieves all
+    saved credentials through the \texttt{useCredentials} hook. While the
+    request is in progress, a loading indicator is displayed. If the
+    request fails, an error message with a retry button is shown.
+    \item \textbf{Search and Filtering}: Users can search credentials by
+    name or credential type using the search box. Filter buttons are
+    generated automatically from the available credential types,
+    allowing users to quickly display only matching credentials.
+    \item \textbf{Credential Management}: Clicking the Add Credential
+    button opens the \texttt{AddCredential} drawer with an empty form.
+    When editing an existing credential, the selected credential is
+    passed to the same drawer, which automatically switches to edit
+    mode. Saving the form creates a new credential or updates the
+    existing one based on the current operation.
+    \item \textbf{Secure Credential Preview}: Instead of displaying
+    sensitive values directly, the component masks credential
+    information before rendering it in the table. Email addresses and
+    long keys are partially hidden to protect sensitive data while
+    still allowing users to identify the correct credential.
+    \item \textbf{Interactive Table Actions}: Action buttons remain
+    hidden until the user hovers over a credential row. From there,
+    users can edit or delete the selected credential. Deleting a
+    credential immediately updates the displayed list after the
+    operation completes successfully.
+    \item \textbf{Responsive Layout}: The credentials table
+    automatically adapts to different screen sizes. On smaller devices,
+    less important columns such as the key preview and added date are
+    hidden, while the search bar and filter buttons rearrange to
+    maintain a clean and usable interface.
+\end{enumerate}
+ 
+\paragraph{AddCredential Component}
+ 
+\paragraph{Purpose}
+Provides a drawer-based interface for creating new credentials and
+updating existing ones. It dynamically generates the required input
+fields based on the selected credential type, validates user input, and
+securely submits credential information without leaving the dashboard.
+ 
+ \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/overview-page/add-credential.png}
+    \caption{The Add Credential drawer, showing dynamically generated fields for an SMTP credential.}
+    \label{fig:add-credential-drawer}
+\end{figure}
+ 
+\paragraph{Location}
+\texttt{src/components/AddCredential.jsx}
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{open} (Boolean): Controls whether the credential
+    drawer is visible.
+    \item \texttt{onClose} (Function): Closes the drawer and resets its
+    state.
+    \item \texttt{onSave} (Function): Receives the credential data and
+    handles creating or updating the credential.
+    \item \texttt{setAuth} (Function): Updates the user's authentication
+    state if authorization needs to be refreshed.
+    \item \texttt{editCredential} (Object): The credential being
+    edited. If no value is provided, the component opens in create
+    mode.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{enumerate}
+    \item \textbf{Create and Edit Modes}: The component supports both
+    creating new credentials and editing existing ones. When an
+    existing credential is passed through \texttt{editCredential}, the
+    form is automatically populated with its current values, the title
+    changes to Edit Credential, and the credential type is locked to
+    prevent accidental changes.
+    \item \textbf{Dynamic Credential Types}: When the drawer opens, the
+    component loads the available credential types and displays them as
+    selectable tabs. Selecting a type retrieves its corresponding
+    parameter definitions and automatically generates the required
+    input fields.
+    \item \textbf{Dynamic Form Generation}: Rather than using a fixed
+    form, the component builds its input fields from the credential
+    type definition returned by the server. This allows different
+    credential types to display different parameters while using the
+    same interface.
+    \item \textbf{Input Validation}: Before saving, the component
+    validates the credential name and all required parameters. Fields
+    with missing values are highlighted, and validation messages are
+    displayed without sending an invalid request to the server.
+    \item \textbf{Secure Password Handling}: Parameters marked as
+    sensitive are rendered as password fields with a visibility toggle.
+    Sensitive values remain hidden by default, and the interface
+    clearly indicates that they are securely stored and not exposed in
+    application logs.
+    \item \textbf{Credential Submission}: After successful validation,
+    the component prepares the credential payload and passes it to the
+    parent through the \texttt{onSave} callback. Depending on the
+    current mode, the parent either creates a new credential or updates
+    the existing one. During submission, the action buttons are
+    disabled to prevent duplicate requests.
+    \item \textbf{Loading and Error Handling}: Loading indicators are
+    displayed while credential types or parameter definitions are being
+    retrieved. If an error occurs while loading data or saving the
+    credential, an error message is shown while preserving the entered
+    information so the user can retry.
+    \item \textbf{Drawer Management}: The component uses animated
+    transitions when opening and closing the drawer. Closing the drawer
+    clears the form, resets the selected credential type, and removes
+    any temporary validation or error state, ensuring each new session
+    starts with a clean form.
+\end{enumerate}
+ 
+\paragraph{Executions Tab}\mbox{}\\
+\label{sec:executions-tab}
+The Executions tab displays the execution history of the user's
+workflows in a structured, paginated table, with status-based filtering
+to help users monitor workflow runs at a glance.
+ 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/overview-page/executions-tab.png}
+    \caption{The Executions tab, showing execution history with status badges and pagination controls.}
+    \label{fig:executions-tab}
+\end{figure}
+ 
+\paragraph{ExecutionsList Component}
+ 
+\paragraph{Purpose}
+Displays the execution history of the user's workflows in a structured
+table. It allows users to monitor workflow runs, view their execution
+status, apply status-based filters, and navigate through execution
+records using pagination.
+ 
+\paragraph{Location}
+\texttt{src/components/ExecutionsList.jsx}
+ 
+\paragraph{Props}
+\begin{itemize}
+    \item \texttt{setAuth} (Function): Updates the user's authentication
+    state if authorization needs to be refreshed.
+    \item \texttt{statusFilter} (Array): An optional list of execution
+    statuses used to filter the displayed executions.
+    \item \texttt{onClearFilter} (Function): Clears the active status
+    filter and restores the complete execution list.
+\end{itemize}
+ 
+\paragraph{Internal Components}
+\begin{itemize}
+    \item \textbf{ExecutionRow}: Renders a single execution record within
+    the table, displaying workflow information, execution time, workflow
+    type, and status.
+    \item \textbf{Pagination}: Provides page navigation controls when the
+    number of execution records exceeds the configured page size.
+\end{itemize}
+ 
+\paragraph{Behavior \& Logical Flows}
+\begin{enumerate}
+    \item \textbf{Automatic Data Loading}: The component retrieves
+    execution records through the \texttt{useExecutionsList} hook. While
+    the data is loading, a loading indicator is displayed. If the
+    request fails, an error message with a retry button is shown.
+    \item \textbf{Status-Based Filtering}: When a status filter is
+    provided, only executions matching the selected status are
+    displayed. A filter indicator appears above the table, allowing
+    users to quickly identify the active filter and remove it with a
+    single click.
+    \item \textbf{Automatic Page Reset}: Whenever the active status
+    filter changes, the component automatically resets the pagination to
+    the first page. This prevents users from remaining on an invalid
+    page after the filtered results change.
+    \item \textbf{Execution Status Display}: Each execution is displayed
+    with a status badge generated from predefined status configurations.
+    The badge combines an icon, label, and color to clearly distinguish
+    between execution states such as Success, Error, Running, Cancelled,
+    and Crashed.
+    \item \textbf{Pagination}: Execution records are divided into pages
+    containing up to ten items each. When multiple pages are available,
+    the component displays pagination controls that allow users to
+    navigate between pages while preserving any active filters.
+    \item \textbf{Empty and Error States}: If no executions are
+    available, the component displays a placeholder message informing
+    the user that no execution history exists. Loading and error states
+    are handled separately to provide clear feedback during data
+    retrieval or when a request fails.
+    \item \textbf{Responsive Layout}: The execution table automatically
+    adapts to different screen sizes. On tablets, the workflow mode
+    column is hidden to save space, while on smaller mobile devices both
+    the execution time and workflow mode columns are removed, allowing
+    the remaining information to remain clear and readable.
+\end{enumerate}
+ 
+ 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Overview Page in Restricted Mode}
+\label{sec:overview-restricted-mode}
+ 
+To prevent unauthorized access to workflow management features, the
+Overview page enters a restricted mode whenever the user's email address
+is not verified. This state is triggered after a user changes their
+email address, requiring verification before sensitive operations become
+available again.
+ 
+In this mode, the page remains accessible to preserve the application's
+layout and provide visual context, but all protected functionality is
+disabled. Instead of displaying an empty page, the interface presents
+placeholder content and a verification prompt, allowing users to
+understand the available features while clearly indicating that
+verification is required.
+ 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/overview-page/disabled-overview.png}
+    \caption{The Overview Page in restricted mode, showing blurred metrics, a disabled Workflows tab, and the email verification prompt.}
+    \label{fig:overview-restricted-mode}
+\end{figure}
+ 
+The restricted mode includes the following behavior:
+\begin{itemize}
+    \item The Create Workflow button is disabled and displays a tooltip
+    indicating that email verification is required.
+    \item The Metrics section remains visible but is covered by a blur
+    overlay, preventing interaction with workflow statistics.
+    \item The Credentials and Executions tabs are disabled and cannot be
+    selected until the email is verified.
+    \item The Workflows tab remains accessible but displays placeholder
+    workflow cards instead of the user's actual workflows.
+    \item A centered overlay containing a lock icon, an explanatory
+    message, and a Verify Email button is displayed over the tab
+    content.
+    \item Selecting Verify Email resends the verification email, when
+    necessary, and redirects the user to the email verification page to
+    complete the verification process.
+\end{itemize}
+ 
+Rather than hiding the Overview page completely, the system adopts a
+progressive restriction approach. Users can still navigate the interface
+and become familiar with the available functionality, while all
+operations that require a verified identity remain securely disabled.
+This approach improves the overall user experience by clearly
+communicating why certain features are unavailable and guiding users
+toward the verification process required to unlock them.

@@ -1,4 +1,5 @@
 \subsection{Workflow Graph Construction and Pre-Execution Validation}
+\label{subsec:workflow-graph}
  
 Before any workflow can be executed, the system must transform the raw JSON
 payload sent by the frontend into a structured, in-memory graph, and then
@@ -68,7 +69,7 @@ The \texttt{WorkflowGraph} class wraps an \texttt{IWorkflowGraph} value
 object with an \textit{adjacency list} for efficient traversal, and exposes
 graph operations used by both the validation and execution layers.
  
-\paragraph{Internal Representation}
+\textbf{Internal Representation}
  
 The class maintains two parallel data structures:
  
@@ -118,7 +119,7 @@ before mutating state, throwing an \texttt{AppError} if the node or edge is
 already present. This prevents malformed workflow payloads from producing
 silent inconsistencies in the graph.
  
-\paragraph{Finding Trigger Nodes}
+\textbf{Finding Trigger Nodes}
  
 A trigger node is structurally defined as a node with no incoming edges ---
 it sits at the root of a connected component. \texttt{findTriggerNodes}
@@ -144,7 +145,7 @@ node \textit{not} in that set has an in-degree of zero and is therefore a
 candidate trigger. The subsequent validation step then confirms, via the node
 registry, that each such candidate is actually declared as a trigger node type.
  
-\paragraph{Decomposing into Connected Components}
+\textbf{Decomposing into Connected Components}
  
 A workflow canvas may contain multiple independent sub-workflows. Rather than
 validating and executing the entire graph as one unit, the system first
@@ -217,7 +218,7 @@ a raw request payload into a typed \texttt{WorkflowGraph} instance. It is
 called by the workflow controller immediately after the project record is
 fetched from the database.
  
-\paragraph{Input Format}
+\textbf{Input Format}
  
 The frontend serialises the workflow canvas as a JSON object containing a
 \texttt{nodes} array and a \texttt{connections} array. Each node object
@@ -251,7 +252,7 @@ a nested \texttt{data.nodeName} field rather than at the top level:
 }
 \end{lstlisting}
  
-\paragraph{Parsing and Validation}
+\textbf{Parsing and Validation}
  
 The function first validates the shape of the incoming data, then maps each
 raw node object to a typed \texttt{INode}, and finally populates the graph:
@@ -370,7 +371,7 @@ export const validateAllWorkflows =
 The three validators are applied in a deliberate order, described in the
 following subsubsections.
  
-\paragraph{Trigger Node Validation}
+\textbf{Trigger Node Validation}
  
 \texttt{validateTriggerNodes} enforces three structural rules:
  
@@ -418,7 +419,7 @@ const validateTriggerNodes =
 };
 \end{lstlisting}
  
-\paragraph{Node Registry Validation}
+\textbf{Node Registry Validation}
  
 \texttt{checkAllNodesValidation} ensures that every non-trigger node in the
 component is registered in the \texttt{NodeRegistry}. Trigger nodes are
@@ -448,7 +449,7 @@ and returned as a list, which the orchestrator formats into a single error
 message. This allows the user to see all unregistered nodes in one response
 rather than having to fix them one by one.
  
-\paragraph{Cycle Detection}
+\textbf{Cycle Detection}
  
 The cycle check is the last to run and only executes if both preceding checks
 pass. This ordering is intentional: running a DFS-based cycle detector on a

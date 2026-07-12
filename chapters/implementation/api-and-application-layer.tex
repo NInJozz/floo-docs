@@ -1,9 +1,9 @@
-\section{API \& Application Layer}
-\subsection{API Overview}
+\subsection{API \& Application Layer}
+\subsubsection{API Overview}
 
 The FLOO platform is built on a modular, multi-layered architecture using Node.js, Express.js, and TypeScript, designed to ensure a strict separation of concerns between routing, business logic, security, and execution.
 
-\subsubsection{RESTful Conventions}
+\paragraph{RESTful Conventions}
 The API is designed around RESTful principles, where resources are mapped to intuitive endpoints categorized by entity (e.g., \texttt{/user}, \texttt{/project}, \texttt{/node}, \texttt{/credential}). By maintaining a declarative routing structure, the API surface remains clean and self-documenting, preventing business logic from bleeding into the transport layer. The platform utilizes standard HTTP verbs to perform operations:
 \begin{itemize}
     \item \textbf{GET}: Retrieve data or list resources.
@@ -12,7 +12,7 @@ The API is designed around RESTful principles, where resources are mapped to int
     \item \textbf{DELETE}: Remove specific resources or clear session data.
 \end{itemize}
 
-\subsubsection{Authentication and Security}
+\paragraph{Authentication and Security}
 Security is enforced through a tiered middleware system that acts as the application's gatekeeper.
 \begin{itemize}
     \item \textbf{JWT Authentication}: Most endpoints require a valid JSON Web Token (JWT) processed by the \texttt{auth} middleware to identify the requesting user.
@@ -21,7 +21,7 @@ Security is enforced through a tiered middleware system that acts as the applica
     \item \textbf{Public Access}: Certain endpoints, such as initial Auth/OAuth routes and Webhook triggers, allow public access. These are not left unprotected but are instead secured via dedicated, high-threshold rate limiters.
 \end{itemize}
 
-\subsubsection{Response Format and Standardization}
+\paragraph{Response Format and Standardization}
 To ensure consistency across the platform, all responses adhere to the \textbf{JSend} format, providing a predictable structure for the frontend.
 
 \paragraph{HTTP Status Codes}
@@ -57,8 +57,8 @@ Traffic control is central to platform stability. The system employs multiple ti
     \item \textbf{Public Limits}: High-volume triggers, like webhooks, utilize a loose limit (e.g., 1000/min) to accommodate frequent event spikes from external providers.
 \end{itemize}
 
-\subsection{Endpoints Reference}
-\subsubsection{Auth Endpoints}
+\subsubsection{Endpoints Reference}
+\paragraph{Auth Endpoints}
 \label{subsec:auth-endpoints}
 
 This section documents all API endpoints related to user authentication, registration, and session management in FLOO. Most of these endpoints are public but are protected by strict rate limiters and payload validators (\texttt{validateRequest}) to ensure security and prevent abuse.
@@ -416,7 +416,7 @@ This section documents all API endpoints related to user authentication, registr
 \end{table}
 \clearpage
 \FloatBarrier
-\subsubsection{User Endpoints}
+\paragraph{User Endpoints}
 \label{subsec:user-endpoints}
 
 This section documents all API endpoints related to user management, authentication profiles, and account controls in FLOO. Users and profiles are fundamental entities in the system. All endpoints in this section are protected by the \texttt{auth} middleware, requiring a valid JWT token. Role-based access control is strictly enforced via the \texttt{restricTo} middleware.
@@ -977,7 +977,7 @@ This section documents all API endpoints related to user management, authenticat
 \end{table}
 \clearpage
 \FloatBarrier
-\subsubsection{Project Endpoints}
+\paragraph{Project Endpoints}
 \label{subsec:project-endpoints}
 
 This section documents all API endpoints related to project management in FLOO.
@@ -1445,7 +1445,7 @@ Exceeding this limit will result in a \texttt{429 Too Many Requests} response, w
 
 \clearpage
 \FloatBarrier
-\subsubsection{Credential Endpoints}
+\paragraph{Credential Endpoints}
 \label{subsec:credential-endpoints}
 
 This section documents all API endpoints related to credentials management in FLOO, the visual AI automation tool.
@@ -1965,7 +1965,7 @@ Exceeding this limit will result in a \texttt{429 Too Many Requests} response, w
 \end{table}
 \clearpage
 \FloatBarrier
-\subsubsection{Workflow Endpoints}
+\paragraph{Workflow Endpoints}
 \label{subsec:workflow-endpoints}
 
 This section documents all API endpoints related to workflow execution and management in FLOO.
@@ -2074,7 +2074,7 @@ Exceeding either limit will result in a \texttt{429 Too Many Requests} response,
 \end{table}
 \clearpage
 \FloatBarrier
-\subsubsection{Node Endpoints}
+\paragraph{Node Endpoints}
 \label{subsec:node-endpoints}
 
 This section documents all API endpoints related to node management and file operations in FLOO.
@@ -2544,7 +2544,7 @@ Exceeding these limits will result in a \texttt{429 Too Many Requests} response,
 \clearpage
 \FloatBarrier
 
-\subsubsection{Execution Endpoints}
+\paragraph{Execution Endpoints}
 \label{subsec:execution-endpoints}
 
 This section documents all API endpoints related to workflow execution logs and analytics in FLOO.
@@ -2796,7 +2796,7 @@ Additionally, these endpoints are subject to a specific polling rate limit of 12
 \label{tab:get-all-platform-executions-responses}
 \end{table}
 \FloatBarrier
-\subsubsection{Chatbot Endpoints}
+\paragraph{Chatbot Endpoints}
 \label{subsec:chatbot-endpoints}
 
 This section documents all API endpoints related to the FLOO AI chatbot. The chatbot allows users to interact with their project data via an LLM. All endpoints are protected by the \texttt{auth} middleware, requiring a valid JWT token, and the \texttt{restrictToVerified} middleware, ensuring only verified users can access chat functionality. Role-based access control is enforced via the \texttt{restricTo} middleware for \texttt{USER} and \texttt{ADMIN} roles.
@@ -2901,7 +2901,7 @@ This section documents all API endpoints related to the FLOO AI chatbot. The cha
 \end{table}
 \FloatBarrier
 
-\subsubsection{Webhook Endpoints}
+\paragraph{Webhook Endpoints}
 \label{subsec:webhook-endpoints}
 
 This section documents the API endpoints related to external webhook integrations in FLOO.
@@ -2959,7 +2959,7 @@ To prevent abuse, they are protected by a high-threshold rate limiter.
 \label{tab:run-workflow-responses}
 \end{table}
 \FloatBarrier
-\subsubsection{OAuth Endpoints}
+\paragraph{OAuth Endpoints}
 \label{subsec:oauth-endpoints}
 
 This section documents all API endpoints related to OAuth integrations in FLOO, the visual AI automation tool. These specific endpoints handle third-party service connections, primarily the Google Sheets API used for the Google Sheet node. 
@@ -3065,11 +3065,11 @@ While the general API is subject to a standard limit of 150 requests per 15 minu
 \label{tab:google-oauth-callback-responses}
 \end{table}
 \FloatBarrier
-\subsection{Core Functional Flows}
+\subsubsection{Core Functional Flows}
 
 This section details the end-to-end execution flows for the primary features of the FLOO platform. By tracing the lifecycle of requests through our multi-layered architecture—from the initial API gateway to the database and external services—we define the standard operating procedure for our core features.
 
-\subsubsection{Authentication and Registration Flows}
+\paragraph{Authentication and Registration Flows}
 
 The authentication system is designed to provide secure, modular, and consistent user management. All authentication logic is centralized in the \texttt{auth.controller.ts}.
 
@@ -3116,7 +3116,7 @@ The registration and login processes share a common orchestration path. Validati
     \item \textbf{Login}: The \texttt{login} controller validates credentials against the database. Upon success, it returns tokens; on failure (e.g., incorrect credentials or disabled account), it throws an \texttt{AppError}, which is caught by the error handler.
 \end{itemize}
 
-\subsubsection{Password Reset Flow}
+\paragraph{Password Reset Flow}
 Password recovery utilizes a secure two-stage process to prevent unauthorized access.
 
 \begin{figure}[H]
@@ -3148,7 +3148,7 @@ Password recovery utilizes a secure two-stage process to prevent unauthorized ac
     \item \textbf{Verification}: The \texttt{verifyResetCode} controller hashes the new password and clears the reset code from the database upon success.
 \end{enumerate}
 
-\subsubsection{OAuth Authentication Flow}
+\paragraph{OAuth Authentication Flow}
 The OAuth implementation bridges external identity providers and our local application using a ticket-based exchange via Redis.
 
 \begin{figure}[H]
@@ -3177,7 +3177,7 @@ The OAuth implementation bridges external identity providers and our local appli
     \item \textbf{Callback and Ticket Generation}: Upon successful provider authentication, the callback controller creates a UUID-based "auth ticket" stored in Redis with a 15-second TTL.
     \item \textbf{Exchange}: The client (Web or Flutter) calls the \texttt{exchangeTicket} endpoint with the ticket. The backend validates the ticket against Redis, retrieves the user data, and immediately deletes the ticket to prevent re-use.
 \end{itemize}
-\subsubsection{User Management Flows}
+\paragraph{User Management Flows}
 
 The user management system focuses on secure profile maintenance and strict data hygiene during account deletion. All user-centric logic is centralized in \texttt{users.controller.ts}.
 
@@ -3256,7 +3256,7 @@ The account deletion process is designed to be comprehensive, ensuring the remov
     \item \textbf{PII Scrubbing}: The user record is disabled, and sensitive information is overwritten with dummy data to satisfy privacy requirements while maintaining referential integrity.
 \end{enumerate}
 
-\subsubsection{Project Management Flows}
+\paragraph{Project Management Flows}
 
 Project management in the FLOO platform relies on strict access control and centralized request sanitization. All project-related operations are handled by the \texttt{ProjectController}, which enforces data ownership and applies consistent filtering and pagination logic through a helper utility.
 
@@ -3299,7 +3299,7 @@ Project management in the FLOO platform relies on strict access control and cent
     \item \textbf{Owner Enforcement}: Operations modifying or retrieving specific resources (\texttt{getProjectById}, \texttt{deleteProject}, \texttt{updateProject}, \texttt{updateWorkflow}) enforce strict ownership by including the authenticated \texttt{userId} in the Prisma \texttt{where} clause. This prevents unauthorized cross-user access at the database level.
     \item \textbf{Workflow Updates}: The \texttt{updateWorkflow} endpoint performs a multi-step update. After verifying project ownership, it updates the project workflow definition and executes a bulk update on the \texttt{NodeInput} table, marking all associated inputs as \texttt{isDraft: false} to finalize the deployment state.
 \end{itemize}
-\subsubsection{Credential Management Flow}
+\paragraph{Credential Management Flow}
 
 The credential management system is designed to securely handle sensitive user parameters, ensuring that secret data is encrypted before storage and masked upon retrieval. All credential logic is centralized in the \texttt{credentials.controller.ts}.
 
@@ -3335,7 +3335,7 @@ The credential management system is designed to securely handle sensitive user p
     \item \textbf{Credential Retrieval}: When fetching sets, the controller decrypts sensitive values using \texttt{decrypt()} and applies a \texttt{maskValue()} helper to ensure sensitive data is not exposed in the API response.
     \item \textbf{Data Integrity}: All operations are protected by authentication and verification middlewares to ensure only the owner of the credential set can access or modify it, maintaining strict ownership boundaries.
 \end{itemize}
-\subsubsection{Workflow Execution Flow}
+\paragraph{Workflow Execution Flow}
 
 The workflow execution flow manages the validation, graph construction, and job enqueuing process. It is orchestrated by the \texttt{WorkflowController}, which ensures the project exists and the user is authorized before invoking the core execution service.
 
@@ -3379,7 +3379,7 @@ The workflow execution flow manages the validation, graph construction, and job 
     \item \textbf{Error Handling}: Any failure, such as missing IDs or database connectivity issues during the execution setup, throws an \texttt{AppError}, which is caught and formatted by the \texttt{Global Error Handler}.
 \end{itemize}
 
-\subsubsection{Node and File Management Flow}
+\paragraph{Node and File Management Flow}
 
 The node and file management flow handles both the retrieval of available system nodes from the registry and the end-to-end lifecycle of files associated with project nodes, including cloud storage uploads and database persistence.
 
@@ -3423,7 +3423,7 @@ The node and file management flow handles both the retrieval of available system
     \item \textbf{Error Handling}: Any failure—such as file upload exceptions, unauthorized access to a project's node, or missing parameters—is captured by the controller and delegated to the \texttt{Global Error Handler}.
 \end{itemize}
 
-\subsubsection{Execution Management Flow}
+\paragraph{Execution Management Flow}
 
 The execution management flow provides an interface for interacting with workflow logs, aggregated metrics, and administrative oversight. It ensures that users can access logs or delete executions only within the scope of projects they own, while providing administrative endpoints for platform-wide monitoring.
 
@@ -3468,7 +3468,7 @@ The execution management flow provides an interface for interacting with workflo
     \item \textbf{Error Handling}: The controller utilizes centralized error handling for validation failures (e.g., invalid status, project not found) and security violations (e.g., unauthorized deletion attempts).
 \end{itemize}
 
-\subsubsection{Webhook Execution Flow}
+\paragraph{Webhook Execution Flow}
 
 The webhook execution flow enables external services to programmatically trigger project workflows. Unlike the standard API routes, these endpoints are public and do not require authentication, making them suitable for integrations with third-party platforms. They rely on high-threshold rate limiting to handle spikes in external event traffic while maintaining platform stability.
 
@@ -3512,7 +3512,7 @@ The webhook execution flow enables external services to programmatically trigger
     \item \textbf{Error Handling}: The controller handles workflow validation errors and missing project identifiers through the centralized error handling mechanism.
 \end{itemize}
 
-\subsubsection{Google Sheets OAuth Controller Flow}
+\paragraph{Google Sheets OAuth Controller Flow}
 
 The OAuth controller manages the Google Sheets API authentication callback lifecycle, specifically handling redirects from third-party identity providers. It is responsible for verifying credentials, parsing state information to maintain context (such as the \texttt{projectId}), and securely redirecting the user back to the appropriate frontend interface.
 
@@ -3554,8 +3554,8 @@ The OAuth controller manages the Google Sheets API authentication callback lifec
     \item \textbf{Error Handling}: The controller handles invalid OAuth states or missing identifiers through the centralized error handling mechanism, ensuring failed authentication attempts are caught and reported clearly.
 \end{itemize}
 
-\subsection{Middlewares}
-\subsubsection{Authentication Middleware}
+\subsubsection{Middlewares}
+\paragraph{Authentication Middleware}
 The \texttt{auth} middleware authenticates requests by verifying the JWT provided in the Authorization header. If the token is missing, it falls back to a query parameter for OAuth redirects. The \texttt{restrictTo} middleware provides fine-grained Role-Based Access Control (RBAC).
 
 \begin{lstlisting}
@@ -3581,7 +3581,7 @@ export const restricTo = (...roles: string[]) => {
 };
 \end{lstlisting}
 
-\subsubsection{Error Handler Middleware}
+\paragraph{Error Handler Middleware}
 This middleware acts as a facade for the error registry. It maps caught exceptions to their appropriate handlers based on the \texttt{canHandle} criteria.
 
 \begin{lstlisting}
@@ -3591,7 +3591,7 @@ export const errorHandler = (err: unknown, req: Request, res: Response, next: Ne
 };
 \end{lstlisting}
 
-\subsubsection{Verification Middleware}
+\paragraph{Verification Middleware}
 The \texttt{restrictToVerified} middleware checks the \texttt{isVerified} status on the request object, ensuring only accounts with confirmed emails can access protected features.
 
 \begin{lstlisting}
@@ -3603,7 +3603,7 @@ export const restrictToVerified = (req: Request, res: Response, next: NextFuncti
 };
 \end{lstlisting}
 
-\subsubsection{JSend Middleware}
+\paragraph{JSend Middleware}
 The \texttt{jsend} middleware standardizes outgoing API responses by attaching helper methods (\texttt{success}, \texttt{fail}, \texttt{error}) to the Express \texttt{Response} object.
 
 \begin{lstlisting}
@@ -3620,7 +3620,7 @@ export function jsend(req: Request, res: Response, next: NextFunction) {
 }
 \end{lstlisting}
 
-\subsubsection{Rate Limiter Middleware}
+\paragraph{Rate Limiter Middleware}
 This factory function generates IP-based rate limiters with configurable time windows and request maximums, throwing a \texttt{429 Too Many Requests} error when limits are exceeded.
 
 \begin{lstlisting}
@@ -3633,7 +3633,7 @@ export const createRateLimiter = (minutes = 15, max = 100, message = "Too many r
 };
 \end{lstlisting}
 
-\subsubsection{Upload Middleware}
+\paragraph{Upload Middleware}
 The \texttt{uploadMiddleware} configures \texttt{multer} to handle multipart form data, specifically optimized for file uploads with a 5MB size limit per file.
 
 \begin{lstlisting}
@@ -3651,7 +3651,7 @@ export const uploadMiddleware = (req: Request, res: Response, next: NextFunction
 };
 \end{lstlisting}
 
-\subsubsection{Validation Middleware}
+\paragraph{Validation Middleware}
 The \texttt{validateRequest} middleware executes the results of the \texttt{express-validator} checks. If validation fails, it aggregates the errors and propagates them as a \texttt{422 Unprocessable Entity} exception.
 
 \begin{lstlisting}
@@ -3665,11 +3665,11 @@ export const validateRequest = (req: Request, res: Response, next: NextFunction)
 };
 \end{lstlisting}
 
-\subsection{Validation Layer}
+\subsubsection{Validation Layer}
 
 Request validation is abstracted into its own layer using \texttt{express-validator}. Before a request payload is processed, it is checked against strict schemas to ensure data integrity and type safety. This ``fail-fast'' approach guarantees that the underlying controllers and services do not need to perform redundant sanity checks on incoming data .
 
-\subsubsection{Authentication Validators}
+\paragraph{Authentication Validators}
 These validators enforce security policies for user sessions and account recovery.
 \begin{lstlisting}[caption={Authentication validation schemas}]
 // auth.validators.ts
@@ -3697,7 +3697,7 @@ export const resetCodeValidators = [
 ];
 \end{lstlisting}
 
-\subsubsection{Credential Validators}
+\paragraph{Credential Validators}
 These ensure that credential definitions maintain proper parameter structures and validation constraints.
 \begin{lstlisting}[caption={Credential type validation schema}]
 // credential.validator.ts
@@ -3710,7 +3710,7 @@ export const createCredentialTypeValidators = [
 ];
 \end{lstlisting}
 
-\subsubsection{Project Validators}
+\paragraph{Project Validators}
 Project management routes utilize these validators to constrain metadata and versioning data.
 \begin{lstlisting}[caption={Project creation and update validation}]
 // project.validators.ts
@@ -3729,7 +3729,7 @@ export const updateProjectValidators = [
 ];
 \end{lstlisting}
 
-\subsubsection{User Validators}
+\paragraph{User Validators}
 These validators secure user profile modifications, preventing invalid name formats, unauthorized email changes, or weak password updates.
 \begin{lstlisting}[caption={User profile and account validation}]
 // user.validators.ts
@@ -3748,8 +3748,8 @@ export const updatePassword = [
 ];
 \end{lstlisting}
 
-\subsection{Services}
-\subsubsection{Email and Notification Services}
+\subsubsection{Services}
+\paragraph{Email and Notification Services}
 
 \paragraph{Overview}
 The email subsystem is designed to handle automated communications, such as user verification and password reset flows, in a decoupled and highly maintainable manner. It separates the concerns of email configuration, template management, and transport, allowing the application to add new email types or switch transport providers without modifying the core business logic.
@@ -3841,7 +3841,7 @@ export async function sendEmailSMTP(
 
 
 \end{lstlisting}
-\subsubsection{Cloud and AI Services}
+\paragraph{Cloud and AI Services}
 
 \paragraph{Cloudinary Service}
 The Cloudinary service acts as the primary storage layer for the platform, handling file uploads and asset management. It leverages Node.js streams to pipe file buffers directly to Cloudinary's infrastructure, ensuring efficient memory usage.
@@ -3911,7 +3911,7 @@ export async function generateReply(input: Message[] | string): Promise<string> 
 
 This abstraction ensures that the business logic can consume AI responses without needing to handle the complexity of message formatting or model-specific configuration.
 
-\subsubsection{Execution and Node Management Services}
+\paragraph{Execution and Node Management Services}
 
 \paragraph{Workflow Service}
 The Workflow service is responsible for the orchestration and deployment lifecycle of project workflows. It acts as the bridge between the API controller and the execution engine.
@@ -3965,12 +3965,12 @@ The service enforces strict validation rules—limiting file size to 5MB and a m
 
 This atomic orchestration ensures that every file tracked by the database is correctly backed by physical storage, maintaining data integrity for execution logs.
 
-\subsection{Authentication Strategies}
+\subsubsection{Authentication Strategies}
 
-\subsubsection{Overview}
+\paragraph{Overview}
 The strategies layer encapsulates interchangeable authentication algorithms and service integrations using the Passport.js framework. This layer acts as the interface between the platform and external identity providers (IdPs) or service APIs, normalizing disparate authentication protocols into a unified internal workflow. By isolating these integrations, the platform can easily scale support for new services without modifying core business logic.
 
-\subsubsection{OAuth Identity Providers}
+\paragraph{OAuth Identity Providers}
 The system implements three primary OAuth authentication strategies: Discord, GitHub, and Google. While each interacts with a different service provider, they adhere to a consistent internal contract defined by the following execution flow:
 
 \begin{enumerate}
@@ -4000,7 +4000,7 @@ if (!findAuth || findAuth.user.disabled) {
 }
 \end{lstlisting}
 
-\subsubsection{Google Sheets Integration}
+\paragraph{Google Sheets Integration}
 The Google Sheets strategy differs from the standard OAuth providers; it is a service-based strategy rather than an authentication-only strategy. Its primary responsibility is the secure management of third-party API credentials.
 
 \paragraph{Credential Management}
@@ -4028,10 +4028,10 @@ if (refreshTokenValue && refreshTokenParam) {
 \end{lstlisting}
 
 This architectural choice separates the concerns of account authentication from resource delegation, allowing the platform to maintain secure, persistent access to external resources like Google Sheets on behalf of the user.
-\subsection{Types}
+\subsubsection{Types}
 TypeScript interfaces and type definitions form the foundational contract of the application. This layer defines the exact shape of data structures used across the system, ensuring strict compile-time safety and catching structural mismatches between the frontend payloads, the internal API representation, and the execution engine.
 
-\subsubsection{Authentication Request (\texttt{authRequest.type.ts})}
+\paragraph{Authentication Request (\texttt{authRequest.type.ts})}
 This interface extends the standard Express \texttt{Request} object to inject custom user context. It is used by authentication middlewares to propagate identity information, including the user's unique identifier, role (used for RBAC), email, and their verification status throughout the request lifecycle.
 
 \begin{lstlisting}[caption={Authentication Request Interface}]
@@ -4045,7 +4045,7 @@ export interface AuthRequest extends Request {
 }
 \end{lstlisting}
 
-\subsubsection{Google OAuth Profile (\texttt{googleProfile.type.ts})}
+\paragraph{Google OAuth Profile (\texttt{googleProfile.type.ts})}
 This interface standardizes the data structure returned by the Passport.js Google OAuth strategy. It maps the raw profile information into a typed object, allowing the application to securely extract user details like email, name, and locale during the OAuth callback process.
 
 \begin{lstlisting}[caption={Google OAuth Profile Interface}]
@@ -4065,10 +4065,10 @@ export interface GoogleProfile extends Profile {
 }
 \end{lstlisting}
 
-\subsection{Utils}
+\subsubsection{Utils}
 The \texttt{utils} directory houses pure, stateless helper functions shared across multiple layers of the application. By centralizing these cryptographic and session-related operations, the platform prevents code duplication and ensures that critical security logic is handled consistently.
 
-\subsubsection{Hashing Utilities (\texttt{hash.util.ts})}
+\paragraph{Hashing Utilities (\texttt{hash.util.ts})}
 This utility abstracts password and data hashing using \texttt{bcryptjs}. It provides two asynchronous methods: \texttt{hash} to securely salt and hash strings (utilizing environment-configured salt rounds), and \texttt{compareHash} to verify plain-text inputs against existing hashes. This ensures that sensitive credentials are never stored in plaintext.
 
 \begin{lstlisting}[caption={Hashing and Comparison Utility}]
@@ -4087,7 +4087,7 @@ export const compareHash = async (value: string, hashed: string) => {
 };
 \end{lstlisting}
 
-\subsubsection{JWT Token Management (\texttt{jwtTokens.util.ts})}
+\paragraph{JWT Token Management (\texttt{jwtTokens.util.ts})}
 This utility manages the application's authentication lifecycle by signing JSON Web Tokens (JWT). It generates both a short-lived access token (2 hours) and a long-lived refresh token (14 days), both containing essential user metadata (ID, email, role, verification status) protected by environment-specific private keys.
 
 \begin{lstlisting}[caption={Token Generation Utility}]
@@ -4112,7 +4112,7 @@ export const generateTokens = (userId: string, userEmail: string, userRole: stri
 }
 \end{lstlisting}
 
-\subsubsection{OTP Generation (\texttt{otp.util.ts})}
+\paragraph{OTP Generation (\texttt{otp.util.ts})}
 This utility leverages \texttt{otplib} to handle one-time password (OTP) generation. It is primarily used during account registration, email updates, and password reset flows to generate time-sensitive tokens sent to the user's email, ensuring verification is authenticated and secure.
 
 \begin{lstlisting}[caption={OTP Generation Utility}]

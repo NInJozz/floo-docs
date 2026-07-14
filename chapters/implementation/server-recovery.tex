@@ -1,0 +1,219 @@
+\section{Server Recovery Strategies}
+\label{sec:server-recovery}
+
+Workflow schedulers (cron and poll triggers) live inside BullMQ, which persists its state in Redis. Postgres, however, remains the single 
+source of truth for \emph{which} projects are supposed to be deployed. Whenever the Node.js process shuts down — deliberately or by 
+crashing — these two stores can drift apart: Redis may still hold scheduler entries for workflows that Postgres no longer considers active, 
+or Postgres may say a project is \texttt{deployed: true} while no scheduler for it actually exists anymore. The recovery subsystem exists 
+to reconcile this drift, and it does so differently depending on whether the shutdown was intentional (development) or unexpected 
+(production).
+
+Two functions implement this behaviour in \texttt{workflow-runner.ts}: \texttt{gracefulStop()}, which runs on a clean local shutdown, 
+and \texttt{recoverDeployedWorkflows()}, which runs on server boot in production.
+
+\subsection{Two Recovery Paths}
+
+The system deliberately treats development and production differently, because the two environments fail in different ways.
+
+\begin{table}[H]
+\centering
+\caption{Recovery strategy by environment}
+\label{tab:recovery-strategy}
+\begin{tabular}{|p{2.8cm}|p{5.2cm}|p{5cm}|}
+\hline
+\textbf{Environment} & \textbf{Trigger} & \textbf{Strategy} \\
+\hline
+Development & \texttt{SIGINT}/\texttt{SIGTERM}/\texttt{SIGTSTP} on local shutdown & \texttt{gracefulStop()} — actively tears down every 
+scheduler before the process exits \\
+\hline
+Production & Server startup (\texttt{index.ts}) & \texttt{recoverDeployedWorkflows()} — assumes the previous process died without cleanup 
+and resyncs from Postgres \\
+\hline
+\end{tabular}
+\end{table}
+
+Both functions guard themselves against running in the wrong environment:
+
+\begin{lstlisting}
+export const gracefulStop = async () => {
+  if (process.env.ENV === 'production') return;
+  ...
+};
+
+export const recoverDeployedWorkflows = async () => {
+  if (process.env.ENV === 'development') return;
+  ...
+};
+\end{lstlisting}
+
+In development, restarting the server (e.g. via \texttt{nodemon}) is frequent and expected, so schedulers are stopped cleanly on every 
+shutdown — there is no need to \emph{recover} anything on the next boot, because nothing was left dangling. In production, a crash is the 
+failure mode being planned for: the process could die at any point without running its shutdown hooks, so recovery has to assume Redis and 
+Postgres have already diverged and must be resynced from scratch when the server comes back up.
+
+\subsection{Dev Mode: \texttt{gracefulStop()}}
+
+On a local shutdown, the function queries Postgres for every project that is currently marked \texttt{deployed: true} and 
+\texttt{active: true}, rebuilds each one's workflow graph, and calls \texttt{stopTriggerNodes()} on it to remove the corresponding BullMQ 
+schedulers:
+
+\begin{lstlisting}
+const deployedProjects = await prisma.project.findMany({
+  where: { deployed: true, active: true },
+  select: { id: true, workflow: true }
+});
+
+for (const project of deployedProjects) {
+  await stopTriggerNodes(buildWorkflowGraph(project), project.id);
+}
+\end{lstlisting}
+
+Once every scheduler has been removed, it performs a single atomic update: any execution still marked \texttt{NEW} or \texttt{RUNNING} is 
+transitioned to \texttt{CANCELLED} with an explanatory error message, and every affected project is flipped back to \texttt{deployed: false}:
+
+\begin{lstlisting}
+await prisma.$transaction([
+  prisma.execution.updateMany({
+    where: {
+      projectId: { in: projectIds },
+      status: { in: [ExecutionStatus.NEW, ExecutionStatus.RUNNING] }
+    },
+    data: {
+      status: ExecutionStatus.CANCELLED,
+      endedAt: new Date(),
+      error: 'Server shutdown - execution canceled'
+    }
+  }),
+  prisma.project.updateMany({
+    where: { id: { in: projectIds } },
+    data: { deployed: false }
+  })
+]);
+\end{lstlisting}
+
+Wrapping both updates in a single \texttt{\$transaction} matters here: it guarantees that Postgres never ends up in a state where an execution 
+is left \texttt{RUNNING} while its parent project is already marked \texttt{deployed: false}, or vice versa. Since this path runs before the process actually exits, the developer gets a workspace that is fully clean the next time the server starts — no stale schedulers in Redis, no dangling executions in Postgres.
+
+\subsection{Production: \texttt{recoverDeployedWorkflows()}}
+
+Production cannot rely on a clean shutdown sequence running, so recovery happens the other way around: on startup, before the server accepts
+ new deployments, this function walks through what the \emph{previous} process left behind and repairs it in three phases.
+
+\subsubsection{Phase 1 --- Clean up dangling executions}
+
+Any execution still sitting in \texttt{NEW} or \texttt{RUNNING} status could only have gotten there if the process died mid-flight; a healthy
+ shutdown would have already cancelled them (dev) or nothing would have started a new one this early (prod). These are reclassified as \texttt{CRASHED} 
+ rather than \texttt{CANCELLED}, since the distinction is diagnostically useful — a cancellation is intentional, a crash is not:
+
+\begin{lstlisting}
+const cleanupResult = await prisma.execution.updateMany({
+  where: { status: { in: [ExecutionStatus.NEW, ExecutionStatus.RUNNING] } },
+  data: {
+    status: ExecutionStatus.CRASHED,
+    endedAt: new Date(),
+    error: 'Server crashed unexpectedly - execution terminated'
+  }
+});
+\end{lstlisting}
+
+\subsubsection{Phase 2 --- Reload deployed projects}
+
+Postgres is treated as ground truth here: any project still flagged \texttt{deployed: true} and \texttt{active: true} is assumed to need its 
+triggers running again, regardless of what state Redis happens to be in.
+
+\begin{lstlisting}
+const deployedProjects = await prisma.project.findMany({
+  where: { deployed: true, active: true },
+  select: { id: true, workflow: true }
+});
+\end{lstlisting}
+
+\subsubsection{Phase 3 --- Resync, don't restore}
+
+For each deployed project, the function does not assume any existing scheduler is trustworthy. It first calls \texttt{stopTriggerNodes()} to 
+remove whatever might already be registered under that project's deterministic job IDs (\texttt{cron-\{projectId\}-\{nodeId\}}, \texttt{poll-\{projectId\}-\{nodeId\}}), 
+and only then calls \texttt{enqueueTriggerNodes()} to schedule them fresh:
+
+\begin{lstlisting}
+for (const project of deployedProjects) {
+  const workflowGraph = buildWorkflowGraph(project);
+
+  try {
+    await stopTriggerNodes(workflowGraph, project.id);
+  } catch (err) {
+    console.error(`Failed to remove stale schedulers for ${project.id}`, err);
+  }
+
+  await enqueueTriggerNodes({
+    projectId: project.id,
+    workflowGraph: workflowGraph
+  });
+}
+\end{lstlisting}
+
+This stop-then-reenqueue sequence is a deliberate design choice, not an oversight: it is a \emph{resync}, not a \emph{restore}. If \texttt{upsertJobScheduler} 
+were relied upon alone, a workflow definition that changed while the server was down (e.g. a node's interval parameter was edited) could leave BullMQ 
+holding a scheduler with a mixture of old and new configuration. Explicitly removing first guarantees that whatever gets registered reflects
+ exactly what is currently defined in Postgres, with no possibility of drift surviving the recovery pass.
+
+Each project is recovered independently inside its own \texttt{try/catch}, so a single malformed workflow graph cannot block the rest of the fleet from redeploying:
+
+\begin{lstlisting}
+try {
+  ...
+} catch (err) {
+  console.error(`[Recovery Error] Failed to recover project ${project.id}:`, err);
+}
+\end{lstlisting}
+
+\subsection{Where Recovery Is Wired In}
+
+\texttt{recoverDeployedWorkflows()} is invoked once, from the HTTP server's startup callback in \texttt{index.ts}, strictly gated behind the production check:
+
+\begin{lstlisting}
+const server = app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+
+  if (process.env.ENV === 'production') {
+    recoverDeployedWorkflows()
+      .then(() => console.log('Recovery initialization triggered successfully.'))
+      .catch((error) =>
+        console.error('Critical failure triggering workflow recovery on startup:', error)
+      );
+  }
+});
+\end{lstlisting}
+
+\texttt{gracefulStop()} is invoked from the same file's signal handlers, but only on the development branch of an \texttt{if/else} that also handles 
+the production shutdown path (which cancels executions directly via Prisma but deliberately leaves \texttt{deployed: true} so that the next production
+ boot's recovery pass has something to act on):
+
+\begin{lstlisting}
+if (process.env.ENV === 'production') {
+  await prisma.$transaction([
+    prisma.execution.updateMany({
+      where: { status: { in: [ExecutionStatus.NEW, ExecutionStatus.RUNNING] } },
+      data: {
+        status: ExecutionStatus.CANCELLED,
+        endedAt: new Date(),
+        error: 'Server shutdown - execution canceled'
+      }
+    })
+    recoverDeployedWorkflows() // relies on it after restart
+  ]);
+} else {
+  await gracefulStop();
+}
+\end{lstlisting}
+
+This is the key asymmetry between the two paths: in development, \texttt{deployed} is reset to \texttt{false} because the developer expects 
+the workflow to genuinely stop. In production, \texttt{deployed} is left as-is on shutdown, because a production shutdown is far more likely 
+to be a deploy/restart than a deliberate stop, and the intent is for the workflow to come back up automatically.
+
+\subsection{Postgres as the Source of Truth}
+
+Both recovery paths converge on the same underlying principle: Redis and BullMQ hold \emph{ephemeral} scheduling state, while Postgres holds 
+the \emph{durable} record of what a workflow's deployment state ought to be. Neither function ever infers a project's intended deployment status 
+by inspecting BullMQ — it always starts from a Postgres query. This means that even in the worst case, where Redis has been flushed or a job 
+scheduler has silently disappeared, recovery on the next production boot will still reconstruct the correct set of running workflows purely 
+from the \texttt{deployed} flag on each \texttt{Project} row.

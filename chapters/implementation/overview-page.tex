@@ -103,7 +103,7 @@ The Overview Page is the main dashboard of the automation platform and the first
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 const data = await ExecutionService.getAnalytics(
   { days: 7 },
   setAuth
@@ -118,7 +118,7 @@ const data = await ExecutionService.getAnalytics(
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 const METRICS_CONFIG = [
   {
     key: "failedExecutions",
@@ -138,7 +138,7 @@ const METRICS_CONFIG = [
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 onClick={() =>
   isClickable && onMetricClick(filterStatus)
 }
@@ -152,7 +152,7 @@ onClick={() =>
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 {!isLoading && analytics && (
   <ExecutionChart analytics={analytics} />
 )}
@@ -250,7 +250,7 @@ onClick={() =>
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 <WorkflowToggle
   isActive={workflow.deployed}
   workflowId={workflow.id}
@@ -268,7 +268,7 @@ onClick={() =>
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 <JsonPopup
   show={exportModal.show}
   onClose={handleCloseExportModal}

@@ -1,35 +1,25 @@
 \section{File Storage and Node Input/Output Management}
 \label{sec:file-storage}
 
-Many workflow nodes in the platform operate on binary content rather than plain text or JSON — image-processing nodes accept and return images, AI vision nodes accept photographs, and users frequently need to attach files (documents, images) to a node before a workflow ever runs. Since the execution engine itself only understands strings and JSON payloads flowing between nodes, the platform needed an independent subsystem responsible for accepting file uploads, persisting them durably, and exposing stable URLs that node implementations can consume during execution. This subsystem is built around Cloudinary as the storage backend, with two parallel data paths in Postgres: \texttt{NodeInput} for user-attached files, and \texttt{NodeOutput} for files produced by nodes as part of an execution.
+Many workflow nodes operate on binary content rather than plain text — image-processing nodes accept and return images, AI nodes accept photographs, and users often attach files to a node before a workflow ever runs. Since the execution engine itself only passes strings and JSON between nodes, a separate subsystem is needed to accept uploads, persist them durably, and expose stable URLs that nodes can consume during execution. This subsystem uses Cloudinary as the storage backend, with two parallel Postgres models: \texttt{NodeInput} for user-attached files, and \texttt{NodeOutput} for files produced by nodes during execution.
 
-\subsection{Motivation and Design Goals}
-
-Three requirements shaped this feature:
+\subsection{Design Goals}
 
 \begin{itemize}
-  \item \textbf{Decoupling execution from storage.} A node such as \texttt{blurDenoise} does not receive a raw file buffer as input --- it receives a URL string. This keeps the execution engine's data model uniform (everything flowing through the graph is a string or JSON, as described in Subsection~\ref{subsec:workflow-graph}) while still allowing arbitrarily large binary payloads to be referenced cheaply.
-  \item \textbf{Draft vs.\ committed files.} A user may upload a file to a node while still editing a workflow in the visual builder, then discard the node or change their mind before saving. Files should not be considered "attached" to a node until the workflow itself is saved. This required an explicit \texttt{isDraft} flag rather than treating every upload as immediately live.
-  \item \textbf{Per-execution provenance.} Every file a node produces during a run needs to be traceable back to the exact node, execution, project and user that generated it, both for the user-facing UI (so a user can inspect what an execution produced) and for cleanup/ownership enforcement.
+  \item \textbf{Decoupling execution from storage.} A node such as \texttt{blurDenoise} receives a URL string, not a raw buffer — keeping the execution engine's data model uniform while still allowing large binary payloads to be referenced cheaply.
+  \item \textbf{Draft vs.\ committed files.} A user may upload a file to a node while still editing a workflow, then discard the node before saving. Files are not considered "attached" until the workflow is saved, hence an explicit \texttt{isDraft} flag.
+  \item \textbf{Per-execution provenance.} Every file a node produces must be traceable to the exact node, execution, project, and user that generated it, for both the UI and ownership/cleanup enforcement.
 \end{itemize}
 
 \subsection{The Cloudinary Service Layer}
 
-All interaction with Cloudinary is isolated behind a single service module, \texttt{cloudinary.service.ts}, so that no controller or node implementation talks to the Cloudinary SDK directly. This gives the platform one place to change providers later, and one place to reason about error handling for the third-party dependency.
-
-The service configures the SDK once from environment variables at import time, then exposes two operations: \texttt{uploadToCloudinary} and \texttt{deleteFromCloudinary}.
+All Cloudinary interaction is isolated in \texttt{cloudinary.service.ts}, so no controller or node talks to the SDK directly — giving one place to swap providers or reason about error handling.
 
 \begin{lstlisting}
 export const uploadToCloudinary = async (folder: string, fileBuffer: Buffer): Promise<UploadResult> => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        resource_type: "auto",
-        use_filename: true,
-        unique_filename: false,
-        overwrite: true,
-      },
+      { folder, resource_type: "auto", use_filename: true, unique_filename: false, overwrite: true },
       (error, result) => {
         if (error) reject(new AppError(`Upload failed: ${error.message}`, 500));
         else resolve({ url: result!.secure_url, publicId: result!.public_id });
@@ -40,15 +30,14 @@ export const uploadToCloudinary = async (folder: string, fileBuffer: Buffer): Pr
 };
 \end{lstlisting}
 
-A few design decisions are worth calling out:
-
+Key decisions:
 \begin{itemize}
-  \item \textbf{Streaming, not disk-buffering.} \texttt{upload\_stream} accepts a writable stream that the in-memory file buffer is piped into directly. Files never touch the server's local disk, which matters both for statelessness (the API and worker can be scaled horizontally without shared disk) and for avoiding an extra I/O round trip.
-  \item \textbf{\texttt{resource\_type: "auto"}.} Because nodes may produce or accept images, raw documents, or other binary types, the upload call lets Cloudinary infer the resource type rather than hard-coding \texttt{image}. This keeps the service generic across node categories (image-processing nodes today, potentially audio/video/document nodes later).
-  \item \textbf{Deterministic, caller-supplied folder paths.} The \texttt{folder} argument encodes the full logical path (e.g.\ \texttt{users/\{userId\}/projects/\{projectId\}/inputs/\{nodeId\}/\{uuid\}}), so Cloudinary's own hierarchy mirrors the platform's ownership model. This makes bulk cleanup trivial: deleting a user's entire prefix (\texttt{users/\{userId\}}) removes every asset that user ever uploaded or generated, which is exactly what account deletion relies on.
+  \item \textbf{Streaming, not disk-buffering.} The in-memory buffer is piped directly into \texttt{upload\_stream}, so files never touch local disk — important for stateless horizontal scaling.
+  \item \textbf{\texttt{resource\_type: "auto"}.} Lets Cloudinary infer the type, keeping the service generic across current and future node categories.
+  \item \textbf{Deterministic, caller-supplied folder paths.} Paths encode ownership (e.g.\ \texttt{users/\{userId\}/projects/\{projectId\}/inputs/\{nodeId\}/\{uuid\}}), making bulk cleanup by prefix trivial — deleting \texttt{users/\{userId\}} removes everything that user ever uploaded or generated.
 \end{itemize}
 
-Deletion requires slightly more care than upload, because Cloudinary's \texttt{destroy} API requires the caller to state the resource type explicitly --- \texttt{"auto"} is only valid for uploads, not deletions. The service therefore derives the correct type from the stored MIME type before issuing the delete:
+Deletion requires the resource type explicitly (\texttt{"auto"} is upload-only), so it's derived from the stored MIME type:
 
 \begin{lstlisting}
 const toCloudinaryResourceType = (mimeType: string): "image" | "video" | "raw" => {
@@ -56,179 +45,81 @@ const toCloudinaryResourceType = (mimeType: string): "image" | "video" | "raw" =
   if (mimeType.startsWith("video/")) return "video";
   return "raw";
 };
-
-export const deleteFromCloudinary = async (publicId: string, mimeType: string) => {
-  try {
-    await cloudinary.uploader.destroy(publicId, {
-      resource_type: toCloudinaryResourceType(mimeType),
-    });
-  } catch (err: any) {
-    throw new AppError(`Failed to delete file from cloud storage: ${err.message}`, 500);
-  }
-};
 \end{lstlisting}
 
-This is why every \texttt{NodeInput} and \texttt{NodeOutput} record persists its own \texttt{mimeType} rather than relying on the caller to know it at deletion time --- the deletion path is frequently invoked long after the original upload request context (and its \texttt{Content-Type} header) is gone.
+This is why every \texttt{NodeInput}/\texttt{NodeOutput} row persists its own \texttt{mimeType} — deletion often happens long after the original request's \texttt{Content-Type} context is gone.
 
-\subsection{The Input Flow: User-Attached Files}
+\subsection{Input Flow: User-Attached Files}
 \label{subsec:input-flow}
 
-\subsubsection{Receiving the Upload}
+Uploads pass through \texttt{uploadMiddleware}, a Multer wrapper using in-memory storage with a 5\,MB per-file limit and up to 50 files per request, supporting nodes whose input declares \texttt{multiple: true}. Multer errors are converted to \texttt{AppError} so they flow through the same centralized error pipeline as everything else.
 
-Before a controller ever sees a file, the request passes through \texttt{uploadMiddleware}, a thin wrapper around Multer configured for in-memory storage with a 5\,MB per-file limit:
+The \texttt{uploadNodeFiles} controller verifies project ownership, generates a collision-proof path per file, uploads via the Cloudinary service, and writes one \texttt{NodeInput} row per file with \texttt{isDraft: true}:
 
 \begin{lstlisting}
-const multerUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+const uniquePublicId = `users/${userId}/projects/${projectId}/inputs/${nodeId}/${crypto.randomUUID()}`;
+const uploadResult = await uploadToCloudinary(uniquePublicId, file.buffer);
+await prisma.nodeInput.create({
+  data: { nodeId, projectId, userId, mimeType: file.mimetype,
+          publicId: uploadResult.publicId, url: uploadResult.url, isDraft: true }
 });
-
-export const uploadMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const uploader = multerUpload.array("files", 50);
-  uploader(req, res, (err) => {
-    if (err instanceof multer.MulterError) return next(new AppError(err.message, 400));
-    else if (err) return next(err);
-    next();
-  });
-};
 \end{lstlisting}
 
-Accepting up to 50 files per request (field name \texttt{files}) supports the \texttt{multiple: true} option that some node input descriptions declare (see \texttt{INodeInput} in \texttt{workflow.type.ts}), for example a node that processes a batch of images at once. Wrapping Multer's callback-style error handling in an explicit \texttt{next(new AppError(...))} call keeps file-size and file-count violations flowing through the same centralized error-handling pipeline as every other error in the application (Subsection~\ref{subsec:error-handling}), rather than leaking a raw Multer error to the client.
+A node in the visual builder can have experimental uploads that never get promoted if the workflow is never saved — those rows remain orphaned drafts. \texttt{getNodeFiles} filters strictly on \texttt{isDraft: false}, so drafts stay invisible until promoted.
 
-\subsubsection{Persisting the Draft}
-
-The \texttt{uploadNodeFiles} controller is responsible for: verifying the requesting user owns the target project, generating a collision-proof storage path per file, delegating the actual upload to the Cloudinary service, and writing one \texttt{NodeInput} row per file.
-
-\begin{lstlisting}
-for (const file of req.files) {
-  const uniqueFileId = crypto.randomUUID();
-  const uniquePublicId =
-    `users/${userId}/projects/${projectId}/inputs/${nodeId}/${uniqueFileId}`;
-
-  const uploadResult = await uploadToCloudinary(uniquePublicId, file.buffer);
-
-  const record = await prisma.nodeInput.create({
-    data: {
-      nodeId, projectId, userId,
-      mimeType: file.mimetype,
-      publicId: uploadResult.publicId,
-      url: uploadResult.url,
-      isDraft: true,
-    }
-  });
-
-  uploadedFiles.push(record);
-}
-\end{lstlisting}
-
-Every record is created with \texttt{isDraft: true}. This is the crux of the draft-vs-committed design: a node in the visual builder can have files uploaded to it experimentally, and if the user never saves the workflow (or deletes the node before saving), those rows simply remain orphaned drafts rather than being treated as a finalized attachment. The \texttt{getNodeFiles} read endpoint filters explicitly on \texttt{isDraft: false}, so draft uploads are invisible to any consumer other than the upload flow itself until they are promoted.
-
-\subsubsection{Promotion on Save}
-
-Promotion happens as a side effect of saving the workflow graph, inside \texttt{updateWorkflow} (\texttt{project.controller.ts}):
+\textbf{Promotion on save} happens inside \texttt{updateWorkflow}:
 
 \begin{lstlisting}
 const nodeIds = workflow.nodes.map((n: any) => n.id);
-
 await prisma.nodeInput.updateMany({
   where: { nodeId: { in: nodeIds }, userId, isDraft: true },
   data: { isDraft: false },
 });
 \end{lstlisting}
 
-Because the update is scoped to \texttt{nodeId: \{in: nodeIds\}} — the set of node IDs that actually exist in the workflow being saved — any draft files belonging to a node the user deleted from the canvas before saving are \emph{not} promoted, and are left as orphaned drafts. Those orphans are not automatically deleted immediately; they remain until an explicit cleanup or the owning user's account/project is deleted, at which point the whole ownership-prefix deletion in Cloudinary reclaims them regardless of their draft status.
+Because the update is scoped to node IDs present in the saved workflow, draft files belonging to nodes removed before saving are not promoted and remain orphaned — reclaimed later by prefix-based Cloudinary cleanup regardless of draft status.
 
-\subsubsection{Retrieval and Deletion}
-
-Three additional endpoints round out node input management:
-
+\textbf{Retrieval and deletion} endpoints:
 \begin{itemize}
-  \item \texttt{GET /node/:nodeId/files} — returns committed (\texttt{isDraft: false}) files for a node, scoped to \texttt{projectId} and the authenticated \texttt{userId}.
-  \item \texttt{DELETE /node/:nodeId/files} — bulk-deletes every file attached to a node (draft or not), removing both the Cloudinary assets and the Postgres rows. Cloudinary deletion is performed first for every file, and only once all remote deletions succeed does the corresponding \texttt{deleteMany} run against Postgres — this ordering avoids a state where the database claims a file exists but the object no longer exists in storage.
-  \item \texttt{DELETE /node/:nodeId/files/:fileId} — deletes a single file, following the same Cloudinary-then-Postgres ordering.
+  \item \texttt{GET /node/:nodeId/files} — committed files, scoped to project and user.
+  \item \texttt{DELETE /node/:nodeId/files} — bulk-deletes all files for a node; Cloudinary deletion happens first, and Postgres rows are only removed once all remote deletions succeed, avoiding orphaned-in-DB-but-missing-in-storage states.
+  \item \texttt{DELETE /node/:nodeId/files/:fileId} — same ordering, single file.
 \end{itemize}
 
-An admin-only endpoint, \texttt{GET /node/files/all}, additionally exposes every \texttt{NodeInput} row platform-wide (with pagination and an optional \texttt{isDraft} filter, joined with the owning user's email) purely for operational auditing of storage usage.
+An admin-only \texttt{GET /node/files/all} exposes every \texttt{NodeInput} row platform-wide (paginated, optional \texttt{isDraft} filter, joined with owner email) for storage auditing.
 
-\subsection{The Output Flow: Node-Produced Files}
+\subsection{Output Flow: Node-Produced Files}
 \label{subsec:output-flow}
 
-Where the input flow is driven by an HTTP request from the browser, the output flow is driven from inside the BullMQ worker process, as a node's \texttt{execute()} method runs. Two patterns exist in the codebase for producing outputs, both converging on the same \texttt{NodeOutput} table.
+While inputs are driven by HTTP requests from the browser, outputs are produced inside the BullMQ worker as a node's \texttt{execute()} runs. Three patterns converge on \texttt{NodeOutput}.
 
-\subsubsection{Generic Upload Helper}
+\textbf{Generic upload helper.} \texttt{uploadNodeOutputs} in \texttt{nodeoutput.service.ts} is for nodes already holding a raw buffer. It validates file count/size and execution existence, then uploads under \texttt{outputs/execution/\{executionId\}/\{nodeId\}} — namespaced by execution so repeated runs of the same node (e.g.\ in a loop) stay distinguishable. \texttt{userId} and \texttt{projectId} are derived server-side from \texttt{executionId} rather than trusted from the caller, preventing a buggy node from writing under the wrong owner.
 
-\texttt{nodeoutput.service.ts} exposes \texttt{uploadNodeOutputs}, intended for nodes that already hold a raw file buffer in memory (as opposed to nodes that call an external HTTP API which itself returns a hosted URL). It performs validation (file count and size ceilings, presence of the owning execution) before delegating to the same \texttt{uploadToCloudinary} call used by the input flow:
+\textbf{Direct upload from external-API nodes.} Most image-processing nodes (\texttt{blurDenoise}, \texttt{edgeDetection}, \texttt{resize}, \texttt{colorMasking}, \texttt{morphology}, \texttt{threshold}, \texttt{contour}, \texttt{colorSpaceConversion}, \texttt{normalize}, \texttt{crop}) don't upload buffers themselves — they call a Python image-processing microservice with the source image URL plus \texttt{user\_id}/\texttt{project\_id}/\texttt{execution\_id}/\texttt{node\_id}; that service transforms the image, uploads it to Cloudinary, and returns only \texttt{output\_url}. The Node.js side just records the metadata in \texttt{NodeOutput}.
 
-\begin{lstlisting}
-const execution = await prisma.execution.findUnique({
-  where: { id: executionId },
-  include: { project: true }
-});
+\textbf{AI-node pattern.} \texttt{objectDetection} and \texttt{singleImageClassification} fetch the source image bytes themselves, forward them to a Hugging Face endpoint, and (for \texttt{objectDetection}, which returns an annotated image) re-upload via the same \texttt{uploadToCloudinary} helper before recording a \texttt{NodeOutput} row.
 
-for (const file of files) {
-  const uploadResult = await uploadToCloudinary(
-    `users/${userId}/projects/${projectId}/outputs/execution/${executionId}/${nodeId}`,
-    file.buffer
-  );
+Regardless of which pattern a node uses, \texttt{execute()} always resolves to an array of Cloudinary URLs or JSON strings handed to the next node by the worker — keeping the contract uniform from the execution engine's perspective.
 
-  await prisma.nodeOutput.create({
-    data: {
-      nodeId, executionId, projectId, userId,
-      mimeType: file.mimetype,
-      publicId: uploadResult.publicId,
-      url: uploadResult.url,
-    },
-  });
-}
-\end{lstlisting}
+\subsection{Schema Compatibility}
 
-The folder path here is namespaced under \texttt{outputs/execution/\{executionId\}/\{nodeId\}} rather than \texttt{inputs/\{nodeId\}} — this is deliberate, since a single node can be re-executed many times (e.g.\ inside a loop, or across multiple manual runs), and each run's outputs must remain distinguishable and independently addressable. The \texttt{userId} and \texttt{projectId} are not passed by the caller in this case; they are derived server-side from the \texttt{executionId}, which prevents a compromised or buggy node implementation from writing output records under the wrong owner.
-
-\subsubsection{Direct Upload from External-API Nodes}
-
-Several image-processing nodes (e.g.\ \texttt{blurDenoise}, \texttt{edgeDetection}, \texttt{resize}, \texttt{colorMasking}, \texttt{morphology}, \texttt{threshold}, \texttt{contour}, \texttt{colorSpaceConversion}, \texttt{normalize}, \texttt{crop}) do not upload a buffer themselves at all. Instead they call a separate Python image-processing microservice (\texttt{IMAGE\_PROCESSING\_API\_URL}), passing it the \emph{input} image's Cloudinary URL along with \texttt{user\_id}, \texttt{project\_id}, \texttt{execution\_id}, and \texttt{node\_id}; that service performs the transformation, uploads the result to Cloudinary itself, and returns only the resulting \texttt{output\_url}. The Node.js side then just records the metadata:
-
-\begin{lstlisting}
-const response = await fetch(`${API_URL}/blur-denoise`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ image_url: imageUrl, user_id: userId, project_id: projectId,
-                          execution_id: executionId, node_id: nodeId, method, kernel_size, sigma, h_param }),
-});
-const result = await response.json();
-
-await prisma.nodeOutput.create({
-  data: {
-    nodeId, executionId, projectId, userId,
-    mimeType: "image/jpeg",
-    publicId: result.output_url,
-    url: result.output_url,
-  },
-});
-\end{lstlisting}
-
-The AI-oriented nodes (\texttt{objectDetection}, \texttt{singleImageClassification}) follow a related but distinct third pattern: they fetch the source image bytes back from Cloudinary themselves, forward them to a Hugging Face inference endpoint, and (for \texttt{objectDetection}, which returns an annotated image rather than pure JSON) re-upload the inference result to Cloudinary via the same \texttt{uploadToCloudinary} helper used everywhere else, before recording a \texttt{NodeOutput} row. This keeps the contract identical from the execution engine's point of view regardless of which external system actually performed the transformation: whatever happens upstream, a node's \texttt{execute()} always resolves to an array of Cloudinary URLs (or JSON strings) that get handed to the next node in the graph by the worker.
-
-\subsection{Compatibility with the Database Schema}
-
-The full entity-relationship design and field-level rationale for every model are covered in Subection~\ref{subsec:data-layer-architecture}; this section only notes why the existing schema is sufficient to support the file storage feature as described above, without repeating relation or constraint details.
+Briefly, the existing schema needs no changes to support this feature:
 
 \begin{itemize}
-  \item The separation into two distinct models, \texttt{NodeInput} and \texttt{NodeOutput}, mirrors the two independent flows above exactly — user-driven pre-execution attachments versus worker-driven post-execution artifacts — so no single table needs to overload its meaning with a discriminator column, and each can evolve its own indexing strategy independently.
-  \item \texttt{NodeInput.isDraft} directly supports the promotion-on-save behavior; no additional schema was required to represent the draft/committed lifecycle.
-  \item \texttt{NodeOutput} carries \texttt{executionId} (absent from \texttt{NodeInput}, which predates execution entirely) so that outputs from repeated runs of the same node stay distinguishable, matching the per-execution folder namespacing used on the Cloudinary side.
-  \item Both models store \texttt{userId} and \texttt{projectId} redundantly (rather than requiring a join through the node or execution) purely so that ownership checks, storage-usage queries, and the bulk-deletion path can filter directly without traversing the workflow JSON blob stored on \texttt{Project.workflow}.
-  \item \texttt{publicId} is declared unique on both models, which is what allows it to double as the natural key for reconciling a Postgres row with its corresponding Cloudinary asset during deletion.
-  \item No schema change was needed to support the "external API already uploaded to Cloudinary" pattern — since \texttt{NodeOutput} only ever stores a URL/publicId/mimeType triple, it is agnostic to whether the bytes were uploaded by the Node.js process itself or by a downstream microservice acting on its behalf.
+  \item Splitting \texttt{NodeInput}/\texttt{NodeOutput} into distinct models mirrors the two independent flows (pre-execution attachment vs.\ post-execution artifact), avoiding a discriminator column and letting each evolve its own indexing.
+  \item \texttt{NodeInput.isDraft} directly supports promotion-on-save without extra schema.
+  \item \texttt{NodeOutput.executionId} (absent from \texttt{NodeInput}) keeps outputs from repeated runs distinguishable, matching the Cloudinary folder namespacing.
+  \item Both models redundantly store \texttt{userId}/\texttt{projectId} so ownership checks and bulk deletion can filter directly without traversing the \texttt{Project.workflow} JSON blob.
+  \item \texttt{publicId} is unique on both models, serving as the natural key reconciling a Postgres row with its Cloudinary asset during deletion.
 \end{itemize}
 
 \subsection{Ownership, Cleanup, and Lifecycle}
 \label{subsec:lifecycle}
 
-File storage cleanup is anchored on the Cloudinary folder convention rather than on iterating individual Postgres rows wherever possible. When a user deletes their account (\texttt{deleteUserProfile} / \texttt{deleteUserById} in \texttt{users.controller.ts}), the platform issues a single prefix delete:
+Cleanup is anchored on the Cloudinary folder convention rather than iterating individual rows. On account deletion, a single prefix delete is issued:
 
 \begin{lstlisting}
 await cloudinary.api.delete_resources_by_prefix(`users/${id}`);
 \end{lstlisting}
 
-against Cloudinary, executed \emph{outside} of the surrounding Prisma transaction and deliberately non-fatal on failure — a partial or failed cloud cleanup must never block the corresponding database anonymization/deletion from completing, since GDPR-style data-scrubbing guarantees on the relational data are considered the higher-priority invariant. The relational rows for that user's \texttt{NodeInput} and \texttt{NodeOutput} records are then removed as part of the same atomic transaction that deletes their projects and credential sets, guaranteeing no orphaned metadata rows survive even if the Cloudinary side only partially succeeded.
+This runs \emph{outside} the surrounding Prisma transaction and is deliberately non-fatal on failure — a failed cloud cleanup must never block the database anonymization from completing, since scrubbing relational PII is the higher-priority guarantee. The corresponding \texttt{NodeInput}/\texttt{NodeOutput} rows are removed as part of the same atomic transaction that deletes the user's projects and credential sets, so no orphaned metadata survives even if the Cloudinary side only partially succeeded.

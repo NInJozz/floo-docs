@@ -74,6 +74,27 @@
   escapeinside={\%*}{*)}
 }
 
+
+\lstdefinelanguage{Python}{
+  keywords={and, as, assert, async, await, break, class, continue, def,
+    del, elif, else, except, finally, for, from, global, if, import, in,
+    is, lambda, nonlocal, not, or, pass, raise, return, try, while, with,
+    yield},
+  keywordstyle=\color{blue}\bfseries,
+  ndkeywords={self, cls, True, False, None, int, str, float, bool, list,
+    dict, tuple, set, frozenset, bytes, object},
+  ndkeywordstyle=\color{teal}\bfseries,
+  identifierstyle=\color{black},
+  sensitive=true,
+  comment=[l]{\#},
+  morecomment=[s]{"""}{"""},
+  morecomment=[s]{'''}{'''},
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  morestring=[b]',
+  morestring=[b]"
+}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Thesis meta-information
 %%

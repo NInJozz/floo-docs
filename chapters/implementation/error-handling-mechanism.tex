@@ -7,7 +7,7 @@ the middleware layer, allowing new error types to be added without modifying any
 
 \subsubsection{Core Abstractions}
 
-\paragraph{The IErrorHandler Interface}
+\textbf{The IErrorHandler Interface}\\
 The foundation of the system is the \texttt{IErrorHandler} interface, which defines a unified contract that all error handlers must fulfill:
 
 \begin{itemize}
@@ -17,7 +17,7 @@ The foundation of the system is the \texttt{IErrorHandler} interface, which defi
 
 The use of \texttt{unknown} as the type for \texttt{err} in both methods ensures that every concrete handler fully honors the interface contract. Type narrowing happens internally inside each handler's \texttt{handle()} method, where the cast is safe because \texttt{canHandle()} has already confirmed the error type.
 
-\paragraph{The AppError Class}
+\textbf{The AppError Class}\\
 \texttt{AppError} is a custom error class that extends the native JavaScript \texttt{Error}. It is used throughout the application to represent known, expected failures such as resource not found or unauthorized access. It carries three properties:
 
 \begin{itemize}
@@ -28,7 +28,7 @@ The use of \texttt{unknown} as the type for \texttt{err} in both methods ensures
 
 \subsubsection{The Handler Registry Pattern}
 
-\paragraph{Structure}
+\textbf{Structure}\\
 Each error category is encapsulated in its own self-contained handler class. The system includes the following handlers:
 
 \begin{itemize}
@@ -41,15 +41,15 @@ Each error category is encapsulated in its own self-contained handler class. The
     \item \texttt{JwtErrorHandler} — handles JWT errors including invalid signatures, expired tokens, and tokens used before their valid time.
     \item \texttt{BcryptErrorHandler} — handles errors arising from invalid arguments passed to hashing and comparison operations.
     \item \texttt{NodemailerErrorHandler} — handles SMTP connection and authentication errors with specific internal logging per error code.
-    \item \texttt{AppErrorHandler} — handles all intentionally thrown \texttt{AppError} instances from application code.
-    \item \texttt{UnexpectedErrorHandler} — a catch-all fallback whose \texttt{canHandle()} always returns \texttt{true}. It must always be the last entry in the registry.
     \item \texttt{CloudinaryErrorHandler} — handles Cloudinary storage service errors such as invalid file uploads, authentication failures, missing resources, and API rate limiting.
     \item \texttt{LLMErrorHandler} — handles large language model (LLM) API errors such as quota exhaustion, rate limiting, context length violations, and invalid request parameters.
     \item \texttt{PassportOAuthErrorHandler} — handles Passport OAuth authentication errors such as invalid or expired tokens, profile retrieval failures, and authorization denial by the user.
     \item \texttt{RateLimitErrorHandler} — handles application rate limiting errors by detecting excessive client requests and returning an appropriate rate limit response.
+    \item \texttt{AppErrorHandler} — handles all intentionally thrown \texttt{AppError} instances from application code.
+    \item \texttt{UnexpectedErrorHandler} — a catch-all fallback whose \texttt{canHandle()} always returns \texttt{true}. It must always be the last entry in the registry.
   \end{itemize}
 
-\paragraph{The Registry}
+\textbf{The Registry}\\
 The \texttt{errorHandlerRegistry} is an ordered array of handler instances. The middleware iterates through it and delegates to the first handler whose \texttt{canHandle()} returns \texttt{true}. Order is 
 significant: specific handlers must precede general ones, and \texttt{UnexpectedErrorHandler} must always be last.
 

@@ -16,12 +16,12 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item \texttt{ToastContainer} --- Context provider wrapper for rendering asynchronous status notifications.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-signup1-image.png}
     \caption{Authentication signup image}
 \end{figure}
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-signup2-image.png}
     \caption{Authentication signup image error}
@@ -63,7 +63,7 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item \texttt{ToastContainer} --- Renders status messages and error alerts.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-verify-image.png}
     \caption{Authentication verify image}
@@ -89,7 +89,7 @@ The authentication architecture provides secure user onboarding, identity verifi
 
 \subsubsection{Verification Email}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-verifycode-image.png}
     \caption{Authentication verification code image}
@@ -110,7 +110,7 @@ The authentication architecture provides secure user onboarding, identity verifi
     \item \texttt{ToastContainer} --- Renders toast notifications within the page.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-login-image.png}
     \caption{Authentication login image}
@@ -182,7 +182,7 @@ const handleSubmit = async (event) => {
       Cookies.set("userDetails", JSON.stringify(user), { secure: true, sameSite: "Strict" });
 
       const destination = user.role === "ADMIN" ? "/admin/users" : "/overview";
-      navigate(destination, { state: { toastMessage: "You logged in successfully🎉." } });
+      navigate(destination, { state: { toastMessage: "You logged in successfully." } });
     } catch (error) {
       console.error("Login error:", error);
       toast.error(apiErrorMessage(error, "Failed to login user"));
@@ -206,7 +206,7 @@ const handleSubmit = async (event) => {
     \item Authentication flow is handled entirely by the backend after the redirect.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-logingoogle-image.png}
     \caption{Authentication login google image}
@@ -305,14 +305,14 @@ useEffect(() => {
     \item \texttt{ToastContainer} --- Renders toast notifications.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-resetpass1-image.png}
     \caption{Authentication reset password image}
 \end{figure}
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.95\textwidth]{images/auth-pages/auth-resetpass2-image.png}
+    \includegraphics[width=0.9\textwidth, height=0.7\textheight]{images/auth-pages/auth-resetpass2-image.png}
     \caption{Authentication reset password email image}
 \end{figure}
 

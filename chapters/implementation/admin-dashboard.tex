@@ -123,7 +123,7 @@ const fetchUsers = useCallback(async () => {
   }, [page, limit, roleFilter, verFilter, search, setAuth]);
 \end{lstlisting}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/admin-dashboard/admin-users-image.png}
     \caption{Main Users Directory Page Image}
@@ -144,7 +144,7 @@ const fetchUsers = useCallback(async () => {
     \item Implements client-side filtering arrays to search across Project IDs and Names over the locally fetched paginated data blocks.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/admin-dashboard/admin-users-image.png}
     \caption{Main Projects Management Page Image}
@@ -165,7 +165,7 @@ const fetchUsers = useCallback(async () => {
     \item Encapsulates execution payloads inside an \texttt{OutputModal}, actively attempting to \texttt{JSON.parse()} the output string to render it inside a beautifully formatted, scrollable \texttt{<pre>} block, gracefully falling back to raw text on failure.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/admin-dashboard/admin-users-image.png}
     \caption{Main Executions Log Page Image}
@@ -186,7 +186,7 @@ const fetchUsers = useCallback(async () => {
     \item Securely maps external asset URLs utilizing \texttt{target="\_blank"} and \texttt{rel="noreferrer"} anchors to prevent security leakages when navigating to raw blob endpoints.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/admin-dashboard/admin-users-image.png}
     \caption{Main Node Files Page Image}

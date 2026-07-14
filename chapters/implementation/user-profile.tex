@@ -1,0 +1,136 @@
+\subsection{UserProfile Page}
+\label{sec:userprofile-page}
+
+\textbf{Purpose:} Provides a centralized interface for managing user account settings, allowing authenticated users to update their personal information, change their email address and password, securely log out, and permanently delete their account through an organized tab-based interface.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/user-profile/user-profile.png}
+    \caption{The UserProfile Page}
+    \label{fig:userprofile-page}
+\end{figure}
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{pages/userProfile/UserProfile.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Main Components}
+
+\noindent The page is composed of the following components:
+\begin{itemize}
+    \item \texttt{ProfileNavbar} --- Provides quick access to application navigation and global actions.
+    \item \texttt{ProfileSidebar} --- Displays user information and provides navigation between account management sections.
+    \item \texttt{UserProfileTabs} --- Renders the active profile management form according to the selected tab.
+    \item \texttt{UserLogoutPopup} --- Displays a confirmation dialog before terminating the user session.
+\end{itemize}
+
+
+\subsubsection{ProfileNavbar Component}
+
+\textbf{Purpose:} Provides a fixed navigation bar containing shortcuts to common application actions while remaining accessible throughout the profile management experience.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{components/ProfileNavbar.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Props}
+\begin{itemize}
+    \item \texttt{onCreateWorkflow} (Function): Opens the Create Workflow dialog.
+    \item \texttt{avatar} (String): Displays the user's avatar initials.
+    \item \texttt{isVerified} (Boolean): Determines whether workflow creation is enabled.
+\end{itemize}
+
+\vspace{0.2cm}
+\noindent\textbf{Behavior \& Logical Flows}
+\begin{itemize}
+    \item \textbf{Workflow Creation Shortcut:} Provides a shortcut for creating new workflows directly from the profile page. The action is disabled until the user's email has been verified.
+    \item \textbf{Overview Navigation:} Allows users to return directly to the Overview page.
+    \item \textbf{Theme Switching:} Embeds the \texttt{<ModeSwitch />} component, enabling users to switch between application themes.
+    \item \textbf{Avatar Display:} Displays the user's initials inside a circular avatar for quick account identification.
+\end{itemize}
+
+
+\subsubsection{ProfileSidebar Component}
+
+\textbf{Purpose:} Displays user information and provides navigation between the different profile management sections.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{components/ProfileSidebar.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Props}
+\begin{itemize}
+    \item \texttt{profile} (Object): Contains the authenticated user's profile information.
+    \item \texttt{activeTab} (String): Indicates the currently selected settings page.
+    \item \texttt{setActiveTab} (Function): Changes the active profile section.
+    \item \texttt{onLogout} (Function): Opens the logout confirmation dialog.
+\end{itemize}
+
+\vspace{0.2cm}
+\noindent\textbf{Behavior \& Logical Flows}
+\begin{itemize}
+    \item \textbf{Profile Information Display:} Shows the user's avatar, full name, role, and membership date.
+    \item \textbf{Section Navigation:} Selecting any navigation item updates the active tab, causing the corresponding form to be rendered.
+    \item \textbf{Active Navigation Highlighting:} The selected section is visually highlighted to improve navigation clarity.
+    \item \textbf{Logout Trigger:} Selecting Logout invokes the logout confirmation popup instead of immediately terminating the session.
+\end{itemize}
+
+
+\subsubsection{UserProfileTabs Component}
+
+\textbf{Purpose:} Renders the currently selected account management interface and handles all user profile operations.
+
+\vspace{0.2cm}
+\noindent\textbf{Location:} \texttt{components/UserProfileTabs.jsx}
+
+\vspace{0.2cm}
+\noindent\textbf{Props}
+\begin{itemize}
+    \item \texttt{activeTab} (String): Determines which management section is displayed.
+    \item \texttt{handlers} (Object): Contains callback functions responsible for profile operations.
+    \item \texttt{state} (Object): Provides all profile data, loading states, messages, and form values.
+\end{itemize}
+
+\vspace{0.2cm}
+\noindent\textbf{Behavior \& Logical Flows}
+\begin{itemize}
+    \item \textbf{Dynamic Tab Rendering:} Conditionally renders the Personal Information, Email, Password, or Delete Account section according to the active tab.
+    \item \textbf{Profile Update:} Allows users to modify their first and last names before submitting the changes to the backend. Successful updates briefly display a confirmation state on the action button.
+    \item \textbf{Email Update:} Displays the current email address and allows users to submit a replacement email. The update button remains disabled when the entered email matches the current one.
+
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/user-profile/user-profile-email.png}
+    \caption{Update email}
+    \label{fig:userprofile-email}
+    \end{figure}
+    
+    \item \textbf{Password Update:} Provides fields for the current password, new password, and password confirmation. Each password field includes an independent visibility toggle implemented using the Eye and EyeOff icons.
+
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/user-profile/user-profile-password.png}
+    \caption{Update Password}
+    \label{fig:userprofile-password}
+    \end{figure}
+    
+    \item \textbf{Loading Feedback:} During any asynchronous request, action buttons display loading indicators while preventing duplicate submissions.
+    \item \textbf{Success \& Error Notifications:} Displays contextual success or error messages after each backend operation through the reusable MessageAlert component.
+    \item \textbf{Delete Account Confirmation:} Implements a two-step confirmation mechanism before permanently deleting the user's account. The first click arms the delete button, while the second click executes the deletion request, reducing accidental account removal.
+
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/user-profile/user-profile-delete-account.png}
+    \caption{Delete Account}
+    \label{fig:userprofile-delete-account}
+    \end{figure}
+
+     \item \textbf{Logout Confirmation:} Selecting the Logout option from the profile sidebar opens the reusable \texttt{<UserLogoutPopup />} confirmation dialog instead of immediately terminating the session. The popup requires explicit user confirmation before executing the logout request, helping prevent accidental logouts. While the request is in progress, both action buttons become disabled and the confirmation button displays a loading state until the operation completes.
+
+     \begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/user-profile/user-profile-logout.png}
+    \caption{Logout popup}
+    \label{fig:user-profile-logout}
+    \end{figure}
+\end{itemize}

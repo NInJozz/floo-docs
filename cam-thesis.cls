@@ -360,12 +360,17 @@ for the degree of Doctor of Philosophy%
 % (vertically).
 
 %% LOGO box
-\newlength{\cam@logorightnudge}
-\setlength{\cam@logorightnudge}{-0.5\paperwidth+12mm}
-\newsavebox{\cam@logo}
-\begin{lrbox}{\cam@logo}
-\hspace*{\cam@logorightnudge}\includegraphics[width=73mm]{CollegeShields/CUni}
-\end{lrbox}
+\begin{center}
+\begin{minipage}{0.45\textwidth}
+    \centering
+    \includegraphics[width=0.6\textwidth]{CollegeShields/ZagazigUniversity}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+    \centering
+    \includegraphics[width=0.6\textwidth]{CollegeShields/FacultyOfEngineering.png}
+\end{minipage}
+\end{center}
 
 %% THESIS TITLE box
 \newsavebox{\cam@title}

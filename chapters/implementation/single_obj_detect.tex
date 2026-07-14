@@ -1,0 +1,236 @@
+\documentclass[a4paper,12pt]{report}
+
+% Packages needed
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{capt-of}
+\usepackage{titlesec}
+\usepackage{wrapfig}
+\usepackage{needspace}
+
+% Reduce the large empty space before an unnumbered chapter title
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{}{0pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{0pt}{30pt}
+
+% Code listing style (Python)
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=5pt,
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b
+}
+
+\begin{document}
+
+\chapter*{Single Image Classification Implementation}
+\addcontentsline{toc}{chapter}{Single Image Classification Implementation}
+\label{chap:implementation}
+
+\section{Overview}
+\label{sec:overview}
+
+This chapter presents the implementation of the proposed single-image
+classification system based on Convolutional Neural Networks (CNNs). The
+implementation covers the complete development pipeline, beginning with
+dataset preparation and image preprocessing, followed by the design of the
+CNN architecture, model training, performance evaluation, and deployment.
+The objective is to develop an accurate and lightweight classification model
+suitable for integration into the proposed intelligent workflow automation
+platform.
+
+\section{Dataset Preparation}
+\label{sec:dataset-preparation}
+
+\begin{wrapfigure}[19]{r}{0.38\textwidth}
+    \centering
+    \vspace{-45pt}
+    \includegraphics[width=0.36\textwidth]{Images/dataset_organization.png}
+    \caption{Dataset organization and augmentation process.}
+    \label{fig:dataset-organization}
+\end{wrapfigure}
+
+A labeled image dataset containing multiple object categories was used to
+train the proposed CNN model. Before training, the dataset was divided into
+three subsets: training, validation, and testing. This separation enables
+the model to learn representative visual features during training while
+providing an unbiased evaluation on previously unseen images.
+
+To improve the model's generalization capability, data augmentation
+techniques were applied to the training images. Operations such as image
+rotation, horizontal flipping, and zooming generated additional image
+variations without increasing the dataset size, helping reduce overfitting
+and improve robustness.
+
+\section{Image Preprocessing}
+\label{sec:image-preprocessing}
+
+Before being fed into the CNN, every image undergoes a preprocessing
+pipeline to ensure consistent input quality. First, all images are resized
+to a fixed resolution compatible with the network architecture. Pixel
+values are then normalized to improve numerical stability during
+optimization. Finally, class labels are converted into numerical indices
+that can be processed by the learning algorithm.
+
+Applying the same preprocessing steps during both training and inference
+guarantees consistent model behavior and reliable predictions.
+
+\section{CNN Architecture}
+\label{sec:cnn-architecture}
+
+The proposed model employs a lightweight Convolutional Neural Network
+designed to extract meaningful visual representations while maintaining
+computational efficiency. The architecture consists of multiple
+convolutional layers responsible for learning hierarchical image features,
+followed by max-pooling layers that gradually reduce spatial dimensions and
+computational complexity.
+
+\begin{lstlisting}[caption={Proposed CNN architecture}, label={lst:cnn-architecture}]
+model = models.Sequential([
+    layers.Conv2D(32, (3,3), activation='relu', input_shape=(128,128,3)),
+    layers.MaxPooling2D(2,2),
+
+    layers.Conv2D(64, (3,3), activation='relu'),
+    layers.MaxPooling2D(2,2),
+
+    layers.Conv2D(128, (3,3), activation='relu'),
+    layers.MaxPooling2D(2,2),
+
+    layers.Flatten(),
+
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.3),
+
+    layers.Dense(train_gen.num_classes, activation='softmax')
+])
+\end{lstlisting}
+
+After feature extraction, fully connected layers perform high-level
+reasoning, while the final Softmax layer produces the probability
+distribution over all object classes. The predicted class corresponds to
+the category with the highest probability.
+
+This architecture enables the network to progressively learn low-level
+features such as edges and textures before identifying more complex
+semantic patterns required for accurate image classification.
+
+The layers of the proposed architecture are described below:
+
+\begin{itemize}
+    \item \textbf{Input Layer:} Receives the input RGB image and prepares
+        it for feature extraction.
+    \item \textbf{Convolution 1:} Extracts low-level features such as
+        edges, corners, and simple textures.
+    \item \textbf{Max Pooling 1:} Reduces the spatial dimensions while
+        preserving the most important features.
+    \item \textbf{Convolution 2:} Learns more complex visual patterns by
+        combining low-level features.
+    \item \textbf{Max Pooling 2:} Further reduces the feature map size and
+        computational complexity.
+    \item \textbf{Convolution 3:} Extracts high-level semantic features
+        that represent meaningful object characteristics.
+    \item \textbf{Max Pooling 3:} Compresses the feature maps while
+        retaining the most informative features.
+    \item \textbf{Flatten Layer:} Converts the extracted feature maps into
+        a one-dimensional feature vector.
+    \item \textbf{Fully Connected Layer:} Learns the relationship between
+        extracted features and object classes to perform classification.
+    \item \textbf{Dropout Layer:} Randomly deactivates neurons during
+        training to reduce overfitting and improve model generalization.
+    \item \textbf{Output Layer (Softmax):} Computes the probability of
+        each class and predicts the class with the highest probability as
+        the final output.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \vspace{-5pt}
+    \includegraphics[width=0.95\textwidth]{Images/cnn_architecture.png}
+    \vspace{-5pt}
+    \caption{Proposed CNN architecture.}
+    \label{fig:cnn-architecture}
+\end{figure}
+
+\section{Model Training}
+\label{sec:model-training}
+
+The CNN model was trained using the Adam optimizer due to its adaptive
+learning capability and fast convergence. Sparse Categorical Crossentropy
+was selected as the loss function because the classification problem
+involves multiple mutually exclusive classes represented by integer
+labels.
+
+To reduce overfitting, an Early Stopping strategy continuously monitored
+the validation loss and automatically restored the best-performing model
+whenever no further improvement was observed. This approach improves
+generalization while avoiding unnecessary training iterations.
+
+The complete training pipeline consists of loading mini-batches, performing
+forward propagation, computing the classification loss, updating the
+network parameters through backpropagation, and repeating this process
+until convergence.
+
+\needspace{15\baselineskip}
+\section{Model Evaluation}
+\label{sec:model-evaluation}
+
+\begin{wrapfigure}[16]{r}{0.4\textwidth}
+    \centering
+    \vspace{-35pt}
+    \includegraphics[width=0.38\textwidth]{Images/confusion_matrix.png}
+    \caption{Confusion matrix showing class-wise prediction performance on the test set.}
+    \label{fig:confusion-matrix}
+\end{wrapfigure}
+
+Following training, the proposed CNN was evaluated using an independent
+testing dataset to assess its generalization capability. Several
+complementary evaluation metrics were employed to obtain a comprehensive
+understanding of the classifier's performance.
+
+Accuracy measures the overall percentage of correctly classified images.
+Precision evaluates the reliability of positive predictions, while Recall
+measures the ability of the model to identify all relevant instances. The
+F1-score combines Precision and Recall into a single balanced metric,
+particularly useful when class distributions are uneven. A Confusion
+Matrix was generated to visualize class-wise prediction performance and
+identify commonly confused categories. Together, these evaluation metrics
+provide a comprehensive assessment of both the overall classification
+accuracy and the performance of individual classes.
+
+\section{Model Deployment}
+\label{sec:model-deployment}
+
+After training and evaluation, the final CNN model was prepared for
+deployment. The trained network was saved in HDF5 format (\texttt{.h5}),
+while the mapping between numerical class indices and class names was
+stored separately in a JSON file. This separation simplifies deployment and
+enables predictions to be converted into human-readable labels.
+
+During inference, an input image follows the same preprocessing pipeline
+used during training before being passed through the trained CNN. The
+network computes the probability for each class, and the class with the
+highest probability is selected as the final prediction.
+
+This deployment pipeline ensures that the model behaves consistently
+during real-world inference while maintaining the accuracy achieved during
+training.
+
+\end{document}
+

@@ -1,0 +1,519 @@
+\documentclass[a4paper,12pt]{report}
+
+% Packages needed
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{capt-of}
+\usepackage{titlesec}
+\usepackage{wrapfig}
+\usepackage{needspace}
+
+% Reduce the large empty space before a chapter title (no "Chapter N" prefix shown)
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{}{0pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{-50pt}{20pt}
+
+% Code listing style (Python)
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=5pt,
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b
+}
+
+\begin{document}
+
+\setcounter{chapter}{2}
+\setcounter{section}{0}
+\chapter*{Image Processing Nodes}
+\addcontentsline{toc}{chapter}{Image Processing Nodes}
+\label{chap:image-processing-nodes}
+
+The Image Processing Nodes provide a modular preprocessing pipeline for
+computer vision applications. Each node performs a single image processing
+task with configurable parameters and produces the processed image along
+with execution metadata. This modular design allows different nodes to be
+combined flexibly to build customized image processing workflows.
+
+\section{Resize Node}
+\label{sec:resize-node}
+
+The Resize Node adjusts image dimensions to match the required input size
+for subsequent processing stages. It supports multiple resizing strategies
+while preserving image quality through different interpolation methods.
+
+\noindent \textbf{Input:} Image, Target Size, Resize Mode, Interpolation Method \\
+\textbf{Output:} Resized Image, Metadata \\
+\textbf{Supported Modes:} Fit, Fill, Stretch
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:resize-node}]
+if self.mode == "stretch":
+
+    resized = img.resize(
+        (target_w, target_h),
+        self.interpolation
+    )
+
+elif self.keep_aspect_ratio:
+
+    resized = self._resize_with_aspect(
+        img,
+        target_w,
+        target_h
+    )
+\end{lstlisting}
+
+\section{Crop Node}
+\label{sec:crop-node}
+
+The Crop Node extracts a Region of Interest (ROI) from the input image by
+removing unnecessary surrounding areas. This operation reduces
+computational complexity and enables subsequent nodes to focus on the
+relevant image content.
+
+\noindent \textbf{Input:} Image, Crop Coordinates / Crop Size \\
+\textbf{Output:} Cropped Image, Metadata \\
+\textbf{Supported Modes:} Rectangle Crop, Center Crop, ROI Crop, Percentage Crop
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:crop-node}]
+cropped_image = image[
+    y:y + height,
+    x:x + width
+]
+\end{lstlisting}
+
+\section{Transform Node}
+\label{sec:transform-node}
+
+The Transform Node performs geometric transformations on the input image
+for preprocessing and data preparation. It also provides augmentation
+capabilities by combining multiple transformation operations.
+
+\noindent \textbf{Input:} Image, Transformation Parameters \\
+\textbf{Output:} Transformed Image, Metadata \\
+\textbf{Supported Modes:} Rotate, Rotate 90\textdegree, Flip, Affine Transformation, Augmentation
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:transform-node}]
+if self.operation == "rotate":
+
+    img, d = self._rotate(img)
+
+elif self.operation == "flip":
+
+    img, d = self._flip(img)
+
+elif self.operation == "affine":
+
+    img, d = self._affine(img)
+
+elif self.operation == "augment":
+
+    img, d = self._augment(img)
+\end{lstlisting}
+
+\section{Color Space Conversion Node}
+\label{sec:color-space-conversion-node}
+
+The Color Space Conversion Node converts images between different color
+representations to satisfy the requirements of various computer vision
+algorithms. Choosing an appropriate color space improves the performance
+of many image analysis tasks.
+
+\noindent \textbf{Input:} Image, Source Color Space, Destination Color Space \\
+\textbf{Output:} Converted Image, Metadata \\
+\textbf{Supported Modes:} RGB, BGR, Grayscale, HSV, LAB, YCrCb
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:color-space-conversion-node}]
+result = cv2.cvtColor(
+    image,
+    conversion_code
+)
+\end{lstlisting}
+
+\section{Normalize Node}
+\label{sec:normalize-node}
+
+The Normalize Node scales pixel values into standardized numerical ranges
+suitable for machine learning and deep learning models. Different
+normalization techniques are supported to satisfy the requirements of
+different model architectures.
+
+\noindent \textbf{Input:} Image, Normalization Mode \\
+\textbf{Output:} Normalized Image, Metadata \\
+\textbf{Supported Modes:} Min-Max, Mean-Std, Z-Score, Scale
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:normalize-node}]
+if self.mode == "minmax":
+
+    out, details = self._minmax(img)
+
+elif self.mode == "meanstd":
+
+    out, details = self._meanstd(img)
+
+elif self.mode == "zscore":
+
+    out, details = self._zscore(img)
+
+elif self.mode == "scale":
+
+    out, details = self._scale(img)
+\end{lstlisting}
+
+\section{Histogram Analysis Node}
+\label{sec:histogram-analysis-node}
+
+The Histogram Analysis Node analyzes the intensity distribution of
+grayscale or color images by computing histogram values for different
+channels. The generated statistics help evaluate image brightness,
+contrast, and overall intensity distribution before further processing.
+
+\noindent \textbf{Input:} Image, Analysis Mode \\
+\textbf{Output:} Histogram Data, Metadata \\
+\textbf{Supported Modes:} Gray, RGB, HSV, All
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:histogram-analysis-node}]
+hist = cv2.calcHist(
+    [image],
+    [channel],
+    None,
+    [256],
+    [0, 256]
+)
+\end{lstlisting}
+
+\section{Image Enhancement Node}
+\label{sec:image-enhancement-node}
+
+The Image Enhancement Node improves the visual quality of images by
+enhancing contrast, brightness, and illumination. Different enhancement
+techniques are provided to improve image appearance while preserving
+important visual details.
+
+\noindent \textbf{Input:} Image, Enhancement Method, Enhancement Parameters \\
+\textbf{Output:} Enhanced Image, Metadata \\
+\textbf{Supported Modes:} CLAHE, Histogram Equalization, Gamma Correction, Manual Adjustment
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:image-enhancement-node}]
+if safe_method == "clahe":
+
+    clahe = cv2.createCLAHE(
+        clipLimit=clip_limit,
+        tileGridSize=tile_grid
+    )
+
+    lab = cv2.cvtColor(
+        image,
+        cv2.COLOR_BGR2LAB
+    )
+
+    l, a, b = cv2.split(lab)
+
+    l = clahe.apply(l)
+\end{lstlisting}
+
+\section{Histogram Equalization Node}
+\label{sec:histogram-equalization-node}
+
+The Histogram Equalization Node enhances image contrast by redistributing
+pixel intensity values. It supports both global and adaptive histogram
+equalization techniques for handling images with different illumination
+conditions.
+
+\noindent \textbf{Input:} Image, Equalization Method \\
+\textbf{Output:} Equalized Image, Metadata \\
+\textbf{Supported Modes:} Global Histogram Equalization, CLAHE
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:histogram-equalization-node}]
+if method == "clahe":
+
+    clahe = cv2.createCLAHE(
+        clipLimit=clip_limit,
+        tileGridSize=tile_grid
+    )
+
+    result = clahe.apply(gray)
+
+else:
+
+    result = cv2.equalizeHist(gray)
+\end{lstlisting}
+
+\section{Blur \& Denoise Node}
+\label{sec:blur-denoise-node}
+
+The Blur \& Denoise Node reduces image noise while preserving important
+structures and edges. Multiple filtering techniques are available to
+achieve different levels of smoothing according to the application
+requirements.
+
+\noindent \textbf{Input:} Image, Filter Method, Kernel Size, Filter Parameters \\
+\textbf{Output:} Denoised Image, Metadata \\
+\textbf{Supported Modes:} Gaussian Blur, Median Blur, Box Blur, Bilateral Filter, Non-Local Means
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:blur-denoise-node}]
+if safe_method == "gaussian":
+
+    result = cv2.GaussianBlur(
+        image,
+        (k, k),
+        sigmaX=sigma
+    )
+
+elif safe_method == "bilateral":
+
+    result = cv2.bilateralFilter(
+        image,
+        d=k,
+        sigmaColor=sigma,
+        sigmaSpace=sigma
+    )
+\end{lstlisting}
+
+\section{Thresholding Node}
+\label{sec:thresholding-node}
+
+The Thresholding Node converts grayscale images into binary images by
+separating foreground objects from the background. It supports both
+global and adaptive thresholding methods for different lighting
+conditions.
+
+\noindent \textbf{Input:} Image, Threshold Method, Threshold Parameters \\
+\textbf{Output:} Binary Image, Metadata \\
+\textbf{Supported Modes:} Global, Otsu, Adaptive Mean, Adaptive Gaussian
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:thresholding-node}]
+if safe_method == "otsu":
+
+    _, result = cv2.threshold(
+        gray_image,
+        0,
+        max_val,
+        thresh_type +
+        cv2.THRESH_OTSU
+    )
+
+elif safe_method == "adaptive_gaussian":
+
+    result = cv2.adaptiveThreshold(
+        gray_image,
+        max_val,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        thresh_type,
+        b_size,
+        c_val
+    )
+\end{lstlisting}
+
+\section{Morphology Node}
+\label{sec:morphology-node}
+
+The Morphology Node applies morphological operations to binary images in
+order to remove noise, refine object boundaries, and improve segmentation
+quality. The node supports different structuring element shapes and
+multiple iterations.
+
+\noindent \textbf{Input:} Binary Image, Morphological Operation, Kernel Shape, Kernel Size, Iterations \\
+\textbf{Output:} Processed Image, Metadata \\
+\textbf{Supported Modes:} Erosion, Dilation, Opening, Closing, Gradient
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:morphology-node}]
+if safe_method == "erosion":
+
+    result = cv2.erode(
+        binary,
+        kernel,
+        iterations=iterations
+    )
+
+elif safe_method == "closing":
+
+    result = cv2.morphologyEx(
+        binary,
+        cv2.MORPH_CLOSE,
+        kernel,
+        iterations=iterations
+    )
+\end{lstlisting}
+
+\section{Edge Detection Node}
+\label{sec:edge-detection-node}
+
+The Edge Detection Node identifies object boundaries by detecting abrupt
+intensity changes within the image. It provides gradient-based and
+multi-stage edge detection algorithms that are widely used in segmentation
+and feature extraction tasks.
+
+\noindent \textbf{Input:} Image, Edge Detection Method, Detection Parameters \\
+\textbf{Output:} Edge Image, Metadata \\
+\textbf{Supported Modes:} Canny, Sobel
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:edge-detection-node}]
+if safe_method == "canny":
+
+    result = cv2.Canny(
+        gray,
+        threshold1,
+        threshold2
+    )
+
+elif safe_method == "sobel":
+
+    grad_x = cv2.Sobel(
+        gray,
+        cv2.CV_64F,
+        1,
+        0,
+        ksize=ksize
+    )
+
+    grad_y = cv2.Sobel(
+        gray,
+        cv2.CV_64F,
+        0,
+        1,
+        ksize=ksize
+    )
+\end{lstlisting}
+
+\section{Connected Components Node}
+\label{sec:connected-components-node}
+
+The Connected Components Node labels connected foreground regions in a
+binary image and extracts descriptive information for each detected
+object. It can also visualize detected objects using bounding boxes and
+labels.
+
+\noindent \textbf{Input:} Binary Image, Connectivity, Area Constraints \\
+\textbf{Output:} Labeled Image, Component Statistics, Metadata \\
+\textbf{Supported Modes:} 4-Connectivity, 8-Connectivity
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:connected-components-node}]
+num_labels, labels, stats, centroids = \
+cv2.connectedComponentsWithStats(
+
+    binary,
+
+    connectivity=self.connectivity
+
+)
+\end{lstlisting}
+
+\section{Contour \& Shape Detection Node}
+\label{sec:contour-shape-detection-node}
+
+The Contour \& Shape Detection Node detects the external contours of
+objects within a binary image and calculates their geometric boundaries.
+It is commonly used for object localization, measurement, and shape
+analysis.
+
+\noindent \textbf{Input:} Image, Minimum Area, Bounding Box Parameters \\
+\textbf{Output:} Image with Detected Contours, Metadata \\
+\textbf{Supported Modes:} External Contour Detection, Bounding Box Visualization
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:contour-shape-detection-node}]
+contours, _ = cv2.findContours(
+
+    thresh,
+
+    cv2.RETR_EXTERNAL,
+
+    cv2.CHAIN_APPROX_SIMPLE
+
+)
+
+for cnt in contours:
+
+    area = cv2.contourArea(cnt)
+
+    if area > min_area:
+
+        x, y, w, h = cv2.boundingRect(cnt)
+\end{lstlisting}
+
+\section{Feature Extraction Node}
+\label{sec:feature-extraction-node}
+
+The Feature Extraction Node detects distinctive keypoints and computes
+feature descriptors that uniquely represent local image structures. These
+descriptors are later used in image matching, registration, and object
+recognition.
+
+\noindent \textbf{Input:} Image, Feature Extraction Method, Maximum Features \\
+\textbf{Output:} Keypoints, Descriptors, Metadata \\
+\textbf{Supported Modes:} ORB, BRISK, AKAZE
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:feature-extraction-node}]
+if method == "orb":
+
+    detector = cv2.ORB_create(
+
+        nfeatures=max_features
+
+    )
+
+keypoints, descriptors = detector.detectAndCompute(
+
+    gray,
+
+    None
+
+)
+\end{lstlisting}
+
+\section{Feature Matching Node}
+\label{sec:feature-matching-node}
+
+The Feature Matching Node compares feature descriptors extracted from two
+different images to identify corresponding keypoints. It supports
+brute-force matching and provides configurable filtering strategies to
+retain only reliable matches.
+
+\noindent \textbf{Input:} Two Images, Keypoints, Descriptors, Matching Parameters \\
+\textbf{Output:} Matched Features, Matching Statistics, Metadata \\
+\textbf{Supported Modes:} Brute Force (BF), Cross Check, Top-N Matching, Distance Threshold Filtering
+
+\begin{lstlisting}[caption={Core Algorithm}, label={lst:feature-matching-node}]
+matcher = cv2.BFMatcher(
+
+    norm_type,
+
+    crossCheck=cross_check
+
+)
+
+matches = matcher.match(
+
+    descriptors1,
+
+    descriptors2
+
+)
+
+matches = sorted(
+
+    matches,
+
+    key=lambda x: x.distance
+
+)
+\end{lstlisting}
+
+\end{document}

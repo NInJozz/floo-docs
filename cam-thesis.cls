@@ -360,17 +360,10 @@ for the degree of Doctor of Philosophy%
 % (vertically).
 
 %% LOGO box
-\begin{center}
-\begin{minipage}{0.45\textwidth}
-    \centering
-    \includegraphics[width=0.6\textwidth]{CollegeShields/ZagazigUniversity}
-\end{minipage}
-\hfill
-\begin{minipage}{0.45\textwidth}
-    \centering
-    \includegraphics[width=0.6\textwidth]{CollegeShields/FacultyOfEngineering.png}
-\end{minipage}
-\end{center}
+%% LOGO box (removed)
+\newsavebox{\cam@logo}
+\begin{lrbox}{\cam@logo}
+\end{lrbox}
 
 %% THESIS TITLE box
 \newsavebox{\cam@title}
@@ -437,14 +430,19 @@ for the degree of Doctor of Philosophy%
 %%
 %%%%%
 \begin{center}
-~\vspace{.02\cam@titlepagevspace}\\
-{\usebox{\cam@logo}}\\
-\vspace{.28\cam@titlepagevspace}
-{\usebox{\cam@title}}\\
-\vspace{.23\cam@titlepagevspace}
-{\usebox{\cam@authorcollege}}\\
-\null\vfill
+
+\vspace*{2cm}
+
+{\usebox{\cam@title}}
+
+\vspace{2cm}
+
+{\usebox{\cam@authorcollege}}
+
+\vfill
+
 {\usebox{\cam@submitnotice}}
+
 \end{center}
 \hypersetup{pdfsubject={\@subjectline},pdfkeywords={\@keywords}}
 \fi

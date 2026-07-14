@@ -384,7 +384,7 @@
 \begin{lrbox}{\cam@title}
     \begin{minipage}[c][\height][c]{.98\textwidth}
         \begin{center}
-			\Huge%
+			\LARGE%
 				\ifcam@times\else%
 				\bfseries%
 				\fi%

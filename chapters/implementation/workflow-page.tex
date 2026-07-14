@@ -225,7 +225,64 @@ const renderExecutionControls = () => {
 \end{lstlisting}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%  NODE PANEL PART ------ SARA -------  %%%
+\subsection*{NodesPanel Component}
+
+\textbf{Purpose:} Provides the side panel used to add new nodes to a workflow --- guiding users through selecting triggers, categories, and nodes while managing navigation, search, and node configuration.
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[height=6.5cm, keepaspectratio]{images/workflow-page/node-panel-triggers.png}
+        \caption{Trigger selection}
+        \label{fig:nodespanel-triggers}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[height=6.5cm, keepaspectratio]{images/workflow-page/node-panel-categories.png}
+        \caption{Category selection}
+        \label{fig:nodespanel-categories}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.32\textwidth}
+        \centering
+        \includegraphics[height=6.5cm, keepaspectratio]{images/workflow-page/node-panel-nodes.png}
+        \caption{Node selection}
+        \label{fig:nodespanel-nodes}
+    \end{subfigure}
+    \caption{The NodesPanel component, showing the trigger, category, and node selection views.}
+    \label{fig:nodespanel-views}
+\end{figure}
+
+\textbf{Location:} \texttt{src/components/workflow/NodesPanel.jsx}
+
+\textbf{Props:}
+\begin{itemize}
+    \item \texttt{isOpen} (Boolean) --- Controls the panel visibility.
+    \item \texttt{onClose} (Function) --- Closes the panel.
+    \item \texttt{onNodeSelect} (Function) --- Returns the selected trigger or node.
+    \item \texttt{hasNodes} (Boolean) --- Determines the panel's initial view.
+\end{itemize}
+
+\textbf{Internal Components:}
+\begin{itemize}
+    \item \textbf{NodePanelForm:} Responsible for rendering the panel header, contextual search input, and the list of available triggers, categories, or nodes. It dynamically updates the header title and search placeholder according to the current view and retrieves the appropriate dataset using the filtering hooks (\texttt{useFilteredTriggers}, \texttt{useFilteredCategories}, and \texttt{useFilteredNodes}).
+    \item \textbf{ListItem:} Renders the filtered collection of triggers, categories, or nodes. It manages loading, error, and empty-search states, displays the appropriate icons for each item type, and forwards item selection events to the parent component to continue the node selection workflow.
+\end{itemize}
+
+\textbf{Behavior:}
+\begin{itemize}
+    \item \textbf{Multi-Step Navigation:} Guides users through trigger, category, and node selection. Workflows with existing nodes open directly to the category view, while new workflows begin with trigger selection.
+    \item \textbf{State Management:} Maintains the selected trigger, category, node, and search query. Temporary state is reset whenever the panel is closed.
+    \item \textbf{Search Synchronization:} Automatically clears the search field when navigating between views, ensuring each stage displays its complete list.
+    \item \textbf{Node Selection:} Selecting a trigger or node invokes the \texttt{onNodeSelect} callback and closes the panel. Selecting a node also opens the parameter configuration popup.
+    \item \textbf{Panel Presentation:} Displays as a slide-in side panel with an overlay that closes the panel when clicked.
+\end{itemize}
+
+\vfill
+\hrule
+\vspace{0.5cm}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsection*{NodeParameterPopup Component}

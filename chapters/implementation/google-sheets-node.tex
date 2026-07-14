@@ -1,0 +1,138 @@
+\section{Integration Nodes}
+\subsection{The Google Sheets Node}
+
+While trigger nodes define when a workflow starts, integration nodes dictate how the workflow interacts with external third-party services during execution. The \texttt{GoogleSheetNode} acts as a robust connector to the Google Workspace ecosystem, allowing the automation platform to append, read, update, or delete spreadsheet rows dynamically.
+
+Because integration nodes rely heavily on external authentication, this node is deeply integrated with the platform's OAuth and dynamic credential subsystems.
+
+\subsubsection{Execution Flow and Authentication}
+
+To capture the logic visually, the execution flow handles both the requested operation and the lifecycle of the user's OAuth tokens. If an access token expires during workflow execution, the node intercepts the refresh event and atomically updates the encrypted credentials in the database before proceeding.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=1.2cm and 2.5cm,
+  box/.style={rectangle, draw=black, fill=blue!5, thick, minimum width=3.5cm, minimum height=0.8cm, text centered, rounded corners, font=\small},
+  logic/.style={rectangle, draw=black, fill=green!10, thick, minimum width=3.5cm, minimum height=0.8cm, text centered, rounded corners, font=\small},
+  external/.style={rectangle, draw=black, fill=purple!10, thick, minimum width=3.5cm, minimum height=0.8cm, text centered, rounded corners, font=\small},
+  arrow/.style={thick, ->, >=stealth},
+  dashed_arrow/.style={thick, ->, >=stealth, dashed}
+]
+
+\node (input) [box, fill=gray!10] {Execute Node (JSON Inputs)};
+\node (auth) [logic, below=of input] {Resolve Decrypted Credentials};
+\node (refresh) [logic, right=of auth, xshift=0.5cm] {Auto-Refresh \& DB Update};
+\node (api) [external, below=of auth] {Google Sheets API (v4)};
+\node (op) [logic, below=of api] {Process Operation (Append, Read, etc.)};
+\node (output) [box, fill=gray!10, below=of op] {JSON Output / Range Metadata};
+
+\draw [arrow] (input) -- (auth);
+\draw [arrow] (auth) -- (api);
+\draw [dashed_arrow] (auth.east) -- node[above, font=\scriptsize] {If token expired} (refresh.west);
+\draw [dashed_arrow] (refresh.south) |- (api.east);
+\draw [arrow] (api) -- (op);
+\draw [arrow] (op) -- (output);
+\end{tikzpicture}
+\caption{Execution flow of the Google Sheets Integration Node}
+\label{fig:google-sheets-flow}
+\end{figure}
+
+\subsubsection{Core Node Implementation}
+
+The \texttt{GoogleSheetNode} extends the base \texttt{Node} class. Its static description defines the required UI parameters and binds it to the specific Google Sheets credential set identifier (\texttt{cb7c448b-f404-446c-976e-e7d38b6d0811}).
+
+\begin{lstlisting}[caption={Google Sheets Node Description and Configuration}]
+export class GoogleSheetNode extends Node {
+    static description: INodeDescription = {
+        name: "googleSheet",
+        displayName: "Google Sheets",
+        description: "Does operations on the google sheets sheet specified",
+        triggerNode: false,
+        type: "generic",
+        category: "integrations",
+        credentials: ["cb7c448b-f404-446c-976e-e7d38b6d0811"],
+        inputFormat: {
+            displayName: "Enter the data you want to send to the Google Sheet as JSON.",
+            type: "json",
+            required: false
+        },
+        outputType: "json",
+        parameters: [
+            // Dropdowns, toggles, and text inputs for operation mapping
+            { title: "operation", type: "dropdown", options: ["append", "read", "update", "delete"], default: "append" },
+            { title: "spreadsheetUrl", type: "text" },
+            { title: "sheetName", type: "text", default: "Sheet1" },
+            { title: "includeHeaders", type: "toggle", default: true }
+        ]
+    };
+    // ...
+}
+\end{lstlisting}
+
+\subsubsection{Automated Token Refresh}
+
+Instead of failing a workflow execution when a Google access token expires, the node attaches an event listener to the OAuth2 client. Upon receiving a \texttt{tokens} event, it encrypts the new access token and performs a safe update against the \texttt{UserCredentialValue} table without interrupting the active API request.
+
+\begin{lstlisting}[caption={Real-time OAuth Token Refresh Logic}]
+auth.on('tokens', async (tokens) => {
+    if (tokens.access_token) {
+        try {
+            const encryptedAccessToken = encrypt(tokens.access_token);
+            
+            // Resolve parameter ID and update safely
+            const paramTypes = await prisma.credentialParameterType.findMany({
+                where: { typeId: "cb7c448b-f404-446c-976e-e7d38b6d0811", title: { in: ["Access Token"] } }
+            });
+            const accessTokenParam = paramTypes.find(p => p.title === "Access Token");
+            if (!accessTokenParam) return;
+
+            const existing = await prisma.userCredentialValue.findFirst({
+                where: { setId: credentialSetId, paramId: accessTokenParam.id }
+            });
+
+            if (existing) {
+                await prisma.userCredentialValue.update({
+                    where: { id: existing.id },
+                    data: { value: encryptedAccessToken }
+                });
+            }
+        } catch (error) {
+            console.error("Failed to update Google OAuth token automatically:", error);
+        }
+    }
+});
+\end{lstlisting}
+
+\subsubsection{Dynamic Data Processing}
+
+Once connected, the node processes data dynamically based on the selected operation. For operations involving headers (like appending or updating), it intelligently resolves existing spreadsheet headers, maps incoming JSON keys case-insensitively, and creates or formats missing headers on the fly.
+
+\begin{lstlisting}[caption={Header Formatting Utility}]
+// Helper function to format the header row
+async function formatHeaderRow(sheets: any, spreadsheetId: string, sheetName: string) {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheet = meta.data.sheets?.find((s: any) => s.properties?.title === sheetName);
+    const sheetId = sheet?.properties?.sheetId;
+
+    if (sheetId === undefined) return;
+
+    await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+            requests: [{
+                repeatCell: {
+                    range: { sheetId: sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0 },
+                    cell: {
+                        userEnteredFormat: {
+                            textFormat: { bold: true, fontSize: 12 },
+                            backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 }
+                        }
+                    },
+                    fields: "userEnteredFormat(textFormat,backgroundColor)"
+                }
+            }]
+        }
+    });
+}
+\end{lstlisting}

@@ -1,0 +1,254 @@
+\documentclass[a4paper,12pt]{report}
+
+% Packages needed
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{capt-of}
+\usepackage{titlesec}
+\usepackage{wrapfig}
+\usepackage{needspace}
+
+% Reduce the large empty space before an unnumbered chapter title
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{}{0pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{0pt}{30pt}
+
+% Code listing style (Python)
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\ttfamily,
+  stringstyle=\color{red}\ttfamily,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=5pt,
+  frame=single,
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  tabsize=2,
+  captionpos=b
+}
+
+\begin{document}
+
+\chapter*{Text-Guided Object Detection}
+\addcontentsline{toc}{chapter}{Text-Guided Object Detection}
+\label{chap:text-guided-detection}
+
+\section{Overview}
+\label{sec:tgod-overview}
+
+This chapter presents the implementation of the proposed text-guided object
+detection system. Unlike conventional object detection models that detect
+all objects in an image, the proposed architecture localizes only the
+object specified by the user's text prompt. The system combines visual
+information extracted from the input image with semantic information
+generated from the textual prompt to accurately identify the target
+object. The implementation consists of dataset preparation, visual feature
+extraction, text encoding, multimodal fusion, object localization, and
+model training.
+
+\section{Dataset Preparation}
+\label{sec:tgod-dataset-preparation}
+
+The proposed model is trained using images annotated in the YOLO format.
+To support text-guided object detection, every annotated object is
+converted into an independent training sample. Each sample consists of an
+input image, an object prompt, and the corresponding normalized bounding
+box.
+
+For example, if an image contains a person, a car, and a dog, three
+different training samples are generated from the same image. Although the
+image remains unchanged, each sample uses a different text prompt and
+bounding box. This strategy enables the model to associate textual
+descriptions with their corresponding object locations.
+
+Before training, all images are resized to $224 \times 224$ pixels,
+normalized to the range $[0,1]$, and converted into tensors. The object
+names are also encoded into numerical tokens that can be processed by the
+Text Encoder.
+
+\begin{lstlisting}[caption={Creating one training sample for each object}, label={lst:tgod-training-sample}]
+prompt = self.tokenizer.decode(class_id)
+
+self.samples.append({
+    "image": image_name,
+    "prompt": prompt,
+    "bbox": [x, y, w, h],
+})
+\end{lstlisting}
+
+\begin{lstlisting}[caption={Image preprocessing}, label={lst:tgod-image-preprocessing}]
+image = cv2.resize(
+    image,
+    (IMAGE_SIZE, IMAGE_SIZE)
+)
+image /= 255.0
+\end{lstlisting}
+
+\section{Proposed MiniYOLO Architecture}
+\label{sec:tgod-architecture}
+
+The proposed MiniYOLO architecture consists of four main components: the
+Backbone Network, the Text Encoder, the Cross-Attention Fusion module, and
+the Detection Head.
+
+The Backbone extracts hierarchical visual features from the input image,
+while the Text Encoder generates a semantic representation of the object
+prompt. Both representations are combined through the Cross-Attention
+Fusion module, allowing the network to focus only on image regions related
+to the requested object. Finally, the Detection Head predicts the bounding
+box coordinates and confidence score.
+
+\begin{lstlisting}[caption={Model architecture}, label={lst:tgod-model-architecture}]
+self.backbone = Backbone()
+self.text_encoder = TextEncoder()
+self.fusion = CrossAttentionFusion()
+self.head = DetectionHead()
+\end{lstlisting}
+
+\section{Backbone Network}
+\label{sec:tgod-backbone}
+
+The Backbone is responsible for extracting high-level visual features from
+the input image before the detection stage. It consists of five
+convolutional stages, where each stage applies a convolution layer
+followed by Batch Normalization, LeakyReLU activation, and Max Pooling.
+This design enables the network to progressively learn richer feature
+representations while reducing the spatial dimensions of the input.
+
+The early convolutional layers capture low-level features such as edges,
+corners, and textures, whereas deeper layers learn more complex semantic
+information including object parts, shapes, and overall structures. Batch
+Normalization stabilizes the learning process by normalizing feature
+distributions, while LeakyReLU helps maintain gradient flow and avoids
+inactive neurons during training. Max Pooling reduces the feature map size
+while preserving the most informative visual patterns, making the
+extracted features more robust and computationally efficient.
+
+Starting from an input image of $224 \times 224 \times 3$, the Backbone
+gradually increases the number of feature channels from 32 to 512, while
+reducing the spatial resolution to $7 \times 7$. The resulting feature map
+provides a compact yet informative representation of the image, which is
+then forwarded to the Cross-Attention Fusion module.
+
+\begin{lstlisting}[caption={Backbone Convolution Block}, label={lst:tgod-backbone-block}]
+self.block = nn.Sequential(
+    nn.Conv2d(...),
+    nn.BatchNorm2d(...),
+    nn.LeakyReLU(0.1)
+)
+\end{lstlisting}
+
+\section{Text Encoder}
+\label{sec:tgod-text-encoder}
+
+The Text Encoder converts the input object prompt into a semantic feature
+vector. First, the object token is transformed into a dense embedding
+representation using an Embedding layer. The embedded sequence is then
+processed by a Bidirectional LSTM to capture contextual information from
+both directions.
+
+The extracted features are summarized using Mean Pooling, normalized with
+Layer Normalization, and projected into the same feature space as the
+image features. This semantic representation is then forwarded to the
+fusion module.
+
+\begin{lstlisting}[caption={Text encoding}, label={lst:tgod-text-encoding}]
+self.embedding = nn.Embedding(
+    VOCAB_SIZE,
+    EMBEDDING_DIM
+)
+
+self.encoder = nn.LSTM(
+    EMBEDDING_DIM,
+    HIDDEN_DIM,
+    bidirectional=True
+)
+\end{lstlisting}
+
+\section{Cross-Attention Fusion}
+\label{sec:tgod-cross-attention}
+
+The Cross-Attention Fusion module is the core component of the proposed
+architecture because it combines visual and textual information into a
+unified representation. Instead of relying only on image features, the
+detector uses the object prompt to guide the localization process.
+
+Both image and text features are first projected into the same feature
+space. The text feature vector is then expanded across the spatial
+dimensions of the image feature map. Element-wise multiplication is
+performed to compute an attention representation, which is further
+processed to generate an attention map highlighting image regions related
+to the requested object. The attention map is finally multiplied with the
+image features, enhancing relevant regions while suppressing background
+information.
+
+\begin{lstlisting}[caption={Cross-Attention Fusion}, label={lst:tgod-cross-attention-fusion}]
+image = self.image_projection(image_features)
+text = self.text_projection(text_features)
+
+attention = image * text
+fused = image * attention
+\end{lstlisting}
+
+\section{Detection Head}
+\label{sec:tgod-detection-head}
+
+The Detection Head receives the fused feature representation and predicts
+the final localization result. Additional convolutional layers refine the
+extracted features before applying Global Average Pooling to obtain a
+compact feature vector.
+
+The pooled features are then passed through fully connected layers to
+predict five values corresponding to the bounding box center coordinates,
+width, height, and confidence score. Since the proposed model detects only
+the object specified by the text prompt, the Detection Head produces a
+single prediction for each input sample.
+
+\begin{lstlisting}[caption={Detection Head}, label={lst:tgod-detection-head}]
+self.pool = nn.AdaptiveAvgPool2d(1)
+
+self.regressor = nn.Sequential(
+    nn.Linear(256,128),
+    nn.Linear(128,64),
+    nn.Linear(64,5)
+)
+\end{lstlisting}
+
+\section{Model Training}
+\label{sec:tgod-model-training}
+
+The model is trained using paired image-text samples generated during
+dataset preparation. During each iteration, the input image and its
+corresponding text prompt are processed simultaneously to predict the
+target bounding box.
+
+Training is performed using the AdamW optimizer together with a learning
+rate scheduler. The loss function combines Smooth L1 Loss for bounding box
+regression and Binary Cross-Entropy Loss for confidence prediction. The
+model with the lowest validation loss is automatically stored as the best
+checkpoint and later used during inference.
+
+\begin{lstlisting}[caption={Training step}, label={lst:tgod-training-step}]
+predictions = model(images, prompts)
+
+loss, metrics = criterion(
+    predictions,
+    targets
+)
+
+loss.backward()
+optimizer.step()
+\end{lstlisting}
+
+\end{document}

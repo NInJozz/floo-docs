@@ -294,21 +294,21 @@
 
 % DOCVAR: submissionnotice (The submission notice is shown on the bottom of the
 % title page.)
-\newcommand{\@submissionnotice}{%
-\ifcam@firstyr
-First year report submitted
-\else
-This dissertation is submitted
-\fi
-\ifcam@submissiondate
-    on \@submissiondate{}
-\fi
-\ifcam@firstyr
-in partial fulfilment of the requirements
-\fi
-for the degree of Doctor of Philosophy%
-}
-\newcommand{\submissionnotice}[1]{\renewcommand{\@submissionnotice}{#1}}
+% \newcommand{\@submissionnotice}{%
+% \ifcam@firstyr
+% First year report submitted
+% \else
+% This dissertation is submitted
+% \fi
+% \ifcam@submissiondate
+%     on \@submissiondate{}
+% \fi
+% \ifcam@firstyr
+% in partial fulfilment of the requirements
+% \fi
+% for the degree of Doctor of Philosophy%
+% }
+% \newcommand{\submissionnotice}[1]{\renewcommand{\@submissionnotice}{#1}}
 
 % DOCVAR: collegeshield (The name of the file that contains the image of the
 % college's shield. If `collegeshield' is provided, it will be included in the

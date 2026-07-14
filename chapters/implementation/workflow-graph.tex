@@ -1,0 +1,546 @@
+\subsection{Workflow Graph Construction and Pre-Execution Validation}
+\label{subsec:workflow-graph}
+ 
+Before any workflow can be executed, the system must transform the raw JSON
+payload sent by the frontend into a structured, in-memory graph, and then
+verify that the graph is semantically correct. This process occurs in two
+successive phases: \textit{graph construction} and \textit{pre-execution
+validation}. Both phases complete before a single job is enqueued, ensuring
+that the execution engine only receives well-formed, executable workflows.
+ 
+\subsubsection{Data Model}
+ 
+The type system that underpins the entire workflow engine is defined in
+\texttt{workflow.type.ts}. Three core interfaces model the graph structure.
+ 
+\textbf{\texttt{INode}} represents a single node in the workflow. Each node
+carries all the information required to execute it: its unique identifier, the
+node type name used to look it up in the registry, the project and execution
+identifiers, an \texttt{inputSource} policy that decides where the node reads
+its inputs from, the actual input and output data arrays, typed parameters,
+credential references, and the list of its resolved children.
+ 
+\begin{lstlisting}[caption={Core node interface (\texttt{workflow.type.ts})}]
+export interface INode {
+  id:           string;   // unique node id within the workflow
+  type:         string;   // registry key, e.g. "cron", "poll"
+  label:        string;   // human-readable display name
+  projectId:    string;
+  executionId:  string;   // assigned by the worker at runtime
+  inputSource:  'self' | 'parent' | 'combined' | 'any';
+  inputs:       string[]; // user-provided inputs for this node
+  parentOutputs: string[];// outputs received from the upstream node
+  parameters:   any[];
+  credentials?: { typeId: string; setId: string }[];
+  children:     INode[];  // resolved at deployment time
+}
+\end{lstlisting}
+ 
+\textbf{\texttt{IConnection}} is deliberately minimal, capturing only the
+directed edge between two node identifiers:
+ 
+\begin{lstlisting}[caption={Connection and graph interfaces}]
+export interface IConnection {
+  source: string;
+  target: string;
+}
+ 
+export interface IWorkflowGraph {
+  nodes:       INode[];
+  connections: IConnection[];
+}
+\end{lstlisting}
+ 
+\textbf{\texttt{IWorkflowExecutionContext}} is the object passed from the API
+controller to the workflow runner. It bundles the fully constructed graph with
+the project identifier so that downstream functions do not need to accept
+multiple unrelated arguments:
+ 
+\begin{lstlisting}
+export interface IWorkflowExecutionContext {
+  workflowGraph: WorkflowGraph;
+  projectId:     string;
+}
+\end{lstlisting}
+ 
+\subsubsection{The \texttt{WorkflowGraph} Class}
+ 
+The \texttt{WorkflowGraph} class wraps an \texttt{IWorkflowGraph} value
+object with an \textit{adjacency list} for efficient traversal, and exposes
+graph operations used by both the validation and execution layers.
+ 
+\textbf{Internal Representation}
+ 
+The class maintains two parallel data structures:
+ 
+\begin{itemize}
+  \item \texttt{graph} --- the plain \texttt{IWorkflowGraph} object, which
+        stores the canonical lists of nodes and connections and is used
+        wherever a serialisable snapshot of the graph is needed.
+  \item \texttt{adjList} --- a \texttt{Map<string, string[]>} that maps each
+        node identifier to the identifiers of its direct successors. This is
+        kept in sync with \texttt{graph.connections} whenever
+        \texttt{addConnection} is called, allowing $O(1)$ neighbour lookup
+        during traversal instead of scanning the full connection list each time.
+\end{itemize}
+ 
+\begin{lstlisting}[caption={WorkflowGraph construction (\texttt{workflowGraph.class.ts})}]
+export class WorkflowGraph {
+  graph:           IWorkflowGraph;
+  private adjList: Map<string, string[]>;
+ 
+  constructor() {
+    this.graph   = { nodes: [], connections: [] };
+    this.adjList = new Map();
+  }
+ 
+  addNode(node: INode): void {
+    if (this.hasNode(node))
+      throw new AppError(`Node with ID ${node.id} already exists`, 400);
+    this.graph.nodes.push(node);
+  }
+ 
+  addConnection(edge: IConnection): void {
+    if (this.hasConnection(edge))
+      throw new AppError(
+        `Edge from ${edge.source} to ${edge.target} already exists`, 400);
+ 
+    this.graph.connections.push(edge);
+ 
+    if (!this.adjList.has(edge.source))
+      this.adjList.set(edge.source, []);
+    this.adjList.get(edge.source)!.push(edge.target);
+  }
+}
+\end{lstlisting}
+ 
+Both \texttt{addNode} and \texttt{addConnection} perform a duplicate check
+before mutating state, throwing an \texttt{AppError} if the node or edge is
+already present. This prevents malformed workflow payloads from producing
+silent inconsistencies in the graph.
+ 
+\textbf{Finding Trigger Nodes}
+ 
+A trigger node is structurally defined as a node with no incoming edges ---
+it sits at the root of a connected component. \texttt{findTriggerNodes}
+identifies these nodes using an in-degree approach:
+ 
+\begin{lstlisting}[caption={Trigger node detection by in-degree}]
+findTriggerNodes(): INode[] {
+  const allIDs      = this.getNodes().map(n => n.id);
+  const hasIncoming = new Set<string>();
+ 
+  // collect every node that appears as a target of some edge
+  for (const node of this.getNodes())
+    this.getNodeConnections(node.id).forEach(n => hasIncoming.add(n));
+ 
+  // nodes absent from hasIncoming have no parents -> they are triggers
+  const triggerIDs = allIDs.filter(id => !hasIncoming.has(id));
+  return this.graph.nodes.filter(n => triggerIDs.includes(n.id));
+}
+\end{lstlisting}
+ 
+The method builds the set of all nodes that appear as an edge target. Any
+node \textit{not} in that set has an in-degree of zero and is therefore a
+candidate trigger. The subsequent validation step then confirms, via the node
+registry, that each such candidate is actually declared as a trigger node type.
+ 
+\textbf{Decomposing into Connected Components}
+ 
+A workflow canvas may contain multiple independent sub-workflows. Rather than
+validating and executing the entire graph as one unit, the system first
+decomposes it into \textit{connected components} so that each sub-workflow can
+be validated and reported on individually. The decomposition uses BFS over the
+\textit{undirected} version of the graph (edges are traversed in both
+directions):
+ 
+\begin{lstlisting}[caption={Connected component decomposition (BFS)}]
+findConnectedComponents(): WorkflowGraph[] {
+  const visited           = new Set<string>();
+  const components: WorkflowGraph[] = [];
+  const nodeMap           = new Map(this.graph.nodes.map(n => [n.id, n]));
+  const reverseConnections = new Map<string, string[]>();
+ 
+  // build a reverse adjacency map to traverse edges backwards
+  for (const conn of this.graph.connections) {
+    if (!reverseConnections.has(conn.target))
+      reverseConnections.set(conn.target, []);
+    reverseConnections.get(conn.target)!.push(conn.source);
+  }
+ 
+  for (const startNode of this.graph.nodes) {
+    if (visited.has(startNode.id)) continue;
+ 
+    const componentGraph = new WorkflowGraph();
+    const queue          = [startNode];
+    visited.add(startNode.id);
+    componentGraph.addNode(startNode);
+ 
+    while (queue.length > 0) {
+      const current     = queue.shift()!;
+      const forward     = this.adjList.get(current.id)  || [];
+      const backward    = reverseConnections.get(current.id) || [];
+      const neighbours  = [...new Set([...forward, ...backward])];
+ 
+      for (const nId of neighbours) {
+        if (!visited.has(nId)) {
+          visited.add(nId);
+          componentGraph.addNode(nodeMap.get(nId)!);
+          queue.push(nodeMap.get(nId)!);
+        }
+      }
+    }
+ 
+    // copy only the edges that belong to this component
+    for (const conn of this.graph.connections)
+      if (componentGraph.hasNode({ id: conn.source } as INode) &&
+          componentGraph.hasNode({ id: conn.target } as INode))
+        componentGraph.addConnection(conn);
+ 
+    components.push(componentGraph);
+  }
+ 
+  return components;
+}
+\end{lstlisting}
+ 
+Treating the graph as undirected during decomposition is important. A directed
+BFS from a trigger node would miss any nodes upstream of a cycle or any
+disjoint nodes that happen to feed into the same component via reverse edges.
+Using both the forward adjacency list and the reverse map guarantees that every
+node is assigned to exactly one component regardless of edge direction.
+ 
+\subsubsection{Graph Construction from the HTTP Request}
+ 
+The \texttt{getWorkflowGraph} function in
+\texttt{workflow-pre-execution.validations.ts} is the entry point for turning
+a raw request payload into a typed \texttt{WorkflowGraph} instance. It is
+called by the workflow controller immediately after the project record is
+fetched from the database.
+ 
+\textbf{Input Format}
+ 
+The frontend serialises the workflow canvas as a JSON object containing a
+\texttt{nodes} array and a \texttt{connections} array. Each node object
+follows the React Flow schema, where the node's semantic type is stored inside
+a nested \texttt{data.nodeName} field rather than at the top level:
+ 
+\begin{lstlisting}[caption={Example workflow payload from the frontend}]
+{
+  "projectId": "abc-123",
+  "nodes": [
+    {
+      "id": "cron-1761747201552",
+      "data": { "nodeName": "cron", "label": "Scheduled Trigger" },
+      "parameters": [
+        { "title": "interval", "value": 60000 },
+        { "title": "start",    "value": 1700000000000 }
+      ],
+      "credentials": []
+    },
+    {
+      "id": "sheet-1761747208825",
+      "data": { "nodeName": "googleSheet", "label": "Append to Sheet" },
+      "parameters": [...],
+      "credentials": [{ "typeId": "cb7c448b-...", "setId": "f3a1..." }]
+    }
+  ],
+  "connections": [
+    { "source": "cron-1761747201552",
+      "target": "sheet-1761747208825", "type": "custom-edge" }
+  ]
+}
+\end{lstlisting}
+ 
+\textbf{Parsing and Validation}
+ 
+The function first validates the shape of the incoming data, then maps each
+raw node object to a typed \texttt{INode}, and finally populates the graph:
+ 
+\begin{lstlisting}[caption={Graph construction from request body}]
+export const getWorkflowGraph =
+    (body: Record<string, unknown>): WorkflowGraph => {
+ 
+  // --- shape checks -----------------------------------------------
+  const nodesRaw = (body as any).nodes;
+  if (!Array.isArray(nodesRaw) ||
+      nodesRaw.some(n => typeof n.id !== 'string'))
+    throw new AppError('Invalid or missing nodes', 400);
+ 
+  const connectionsRaw = (body as any).connections;
+  if (!Array.isArray(connectionsRaw))
+    throw new AppError('Invalid or missing connections', 400);
+ 
+  const isValidConnections = connectionsRaw.every(conn =>
+    typeof conn.source === 'string' &&
+    typeof conn.target === 'string' &&
+    typeof conn.type   === 'string'
+  );
+  if (!isValidConnections)
+    throw new AppError('Invalid connections', 400);
+ 
+  // --- mapping -------------------------------------------------------
+  const nodes: INode[] = nodesRaw.map(n => ({
+    id:           n.id,
+    type:         n.data?.nodeName,     // unwrap from React Flow schema
+    label:        n.data?.label ?? '',
+    projectId:    body.projectId as string,
+    executionId:  '',                   // assigned later by the worker
+    inputSource:  n.inputSource ?? 'parent',
+    inputs:       n.inputs,
+    parentOutputs: [],
+    parameters:   n.parameters  ?? [],
+    credentials:  n.credentials ?? [],
+    children:     [],                   // resolved at deployment time
+  }));
+ 
+  const connections: IConnection[] = connectionsRaw.map(conn => ({
+    source: conn.source,
+    target: conn.target,
+  }));
+ 
+  // --- graph population ----------------------------------------------
+  const graph = new WorkflowGraph();
+  nodes.forEach(n => graph.addNode(n));
+  connections.forEach(c =>
+    graph.addConnection({ source: c.source, target: c.target }));
+ 
+  return graph;
+};
+\end{lstlisting}
+ 
+Two design details are worth noting. First, \texttt{executionId} is
+intentionally left empty at this stage. The worker assigns it later when it
+creates the \texttt{Execution} database record, and then propagates it through
+all child jobs. Second, \texttt{children} is left as an empty array; the
+workflow runner populates it recursively at deployment time via
+\texttt{buildChildren}, so that the full execution tree travels with each job
+without requiring further graph lookups.
+ 
+\subsubsection{Pre-Execution Validation Pipeline}
+ 
+Validation is orchestrated by \texttt{validateAllWorkflows}, which runs each
+connected component through a sequence of checks. The function returns a
+result object that separates valid sub-workflows from invalid ones, along with
+the specific error messages for each failure:
+ 
+\begin{lstlisting}[caption={Validation orchestrator}]
+export const validateAllWorkflows =
+    async (workflowGraph: WorkflowGraph) => {
+ 
+  const validationResults = {
+    validWorkflows:   [] as IWorkflowGraph[],
+    invalidWorkflows: [] as { workflow: IWorkflowGraph;
+                              errors: string[] }[],
+  };
+ 
+  const components = workflowGraph.findConnectedComponents();
+ 
+  for (const component of components) {
+    const errors: string[] = [];
+ 
+    const unregisteredNodes = checkAllNodesValidation(component);
+    const triggerResult     = validateTriggerNodes(component);
+ 
+    if (!triggerResult.ok)
+      errors.push(triggerResult.msg!);
+ 
+    if (unregisteredNodes.length > 0) {
+      errors.push(`The following nodes are not registered: ` +
+        unregisteredNodes
+          .map(n => `${n.name} (id: ${n.id})`).join(', '));
+ 
+    } else if (triggerResult.ok && unregisteredNodes.length === 0) {
+      // cycle check only runs when the graph structure is already valid
+      const cycleResult = checkCycles(component);
+      if (!cycleResult.ok)
+        errors.push(cycleResult.msg!);
+    }
+ 
+    if (errors.length > 0)
+      validationResults.invalidWorkflows.push(
+        { workflow: component.graph, errors });
+    else
+      validationResults.validWorkflows.push(component.graph);
+  }
+ 
+  return validationResults;
+};
+\end{lstlisting}
+ 
+The three validators are applied in a deliberate order, described in the
+following subsubsections.
+ 
+\textbf{Trigger Node Validation}
+ 
+\texttt{validateTriggerNodes} enforces three structural rules:
+ 
+\begin{enumerate}
+  \item The component must contain at least one node.
+  \item Every node with no incoming edges (as identified by
+        \texttt{findTriggerNodes}) must be declared as a trigger node in the
+        registry (\texttt{triggerNode: true}).
+  \item No node with incoming edges may be a trigger node --- trigger nodes
+        are only valid at the root of a component.
+\end{enumerate}
+ 
+\begin{lstlisting}[caption={Trigger node structural validation}]
+const validateTriggerNodes =
+    (graph: WorkflowGraph): { ok: boolean; msg?: string } => {
+ 
+  const triggerNodes = graph.findTriggerNodes();
+ 
+  if (graph.getNodes().length === 0)
+    return { ok: false, msg: 'No nodes found to execute.' };
+ 
+  if (triggerNodes.length === 0)
+    return { ok: false, msg: 'No start node found or cycle exists.' };
+ 
+  // every root must be a registered trigger
+  for (const node of triggerNodes) {
+    const desc = registry.getDescription(node.type);  // throws if unregistered
+    if (!desc.triggerNode)
+      return { ok: false,
+        msg: `Node '${node.type}' (id: '${node.id}') is at the ` +
+             `start of the workflow but is not a trigger node.` };
+  }
+ 
+  // no non-root node may be a trigger
+  for (const node of graph.getNodes()) {
+    if (triggerNodes.includes(node)) continue;
+    const desc = registry.getDescription(node.type);
+    if (desc.triggerNode)
+      return { ok: false,
+        msg: `Trigger node '${node.type}' (id: '${node.id}') ` +
+             `cannot be used in the middle of a workflow.` };
+  }
+ 
+  return { ok: true };
+};
+\end{lstlisting}
+ 
+\textbf{Node Registry Validation}
+ 
+\texttt{checkAllNodesValidation} ensures that every non-trigger node in the
+component is registered in the \texttt{NodeRegistry}. Trigger nodes are
+excluded from this check because their registration is already verified by
+\texttt{validateTriggerNodes}.
+ 
+\begin{lstlisting}[caption={Registry membership check for non-trigger nodes}]
+const checkAllNodesValidation =
+    (workflowGraph: WorkflowGraph): { name: string; id: string }[] => {
+ 
+  const triggerNodeIds = new Set(
+    workflowGraph.findTriggerNodes().map(n => n.id));
+  const unregistered: { name: string; id: string }[] = [];
+ 
+  for (const node of workflowGraph.graph.nodes) {
+    if (triggerNodeIds.has(node.id)) continue;  // skip triggers
+    if (!registry.has(node.type))
+      unregistered.push({ name: node.type, id: node.id });
+  }
+ 
+  return unregistered;
+};
+\end{lstlisting}
+ 
+If any unregistered nodes are found, their names and identifiers are collected
+and returned as a list, which the orchestrator formats into a single error
+message. This allows the user to see all unregistered nodes in one response
+rather than having to fix them one by one.
+ 
+\textbf{Cycle Detection}
+ 
+The cycle check is the last to run and only executes if both preceding checks
+pass. This ordering is intentional: running a DFS-based cycle detector on a
+graph that contains unregistered nodes or a missing trigger would produce
+unreliable or misleading results, since the graph structure cannot be trusted.
+ 
+Cycle detection uses a standard three-colour DFS algorithm, encoded by the
+\texttt{VisitState} enum:
+ 
+\begin{lstlisting}[caption={\texttt{VisitState} enum (\texttt{workflow.enum.ts})}]
+export enum VisitState {
+  UNVISITED = 0,  // not yet reached
+  VISITING  = 1,  // currently on the DFS call stack
+  VISITED   = 2,  // fully processed, no cycle through this node
+}
+\end{lstlisting}
+ 
+\begin{lstlisting}[caption={DFS cycle detection}]
+const checkCycles =
+    (graph: WorkflowGraph): { ok: boolean; msg?: string } => {
+ 
+  const visited = new Map<string, VisitState>(
+    graph.getNodes().map(n => [n.id, VisitState.UNVISITED]));
+ 
+  const dfs = (u: string): boolean => {
+    visited.set(u, VisitState.VISITING);
+ 
+    for (const v of graph.getNodeConnections(u)) {
+      if (visited.get(v) === VisitState.VISITING) return true;  // back edge
+      if (visited.get(v) === VisitState.UNVISITED && dfs(v))   return true;
+    }
+ 
+    visited.set(u, VisitState.VISITED);
+    return false;
+  };
+ 
+  for (const node of graph.getNodes())
+    if (visited.get(node.id) === VisitState.UNVISITED)
+      if (dfs(node.id))
+        return { ok: false, msg: 'Workflow has cycles' };
+ 
+  return { ok: true };
+};
+\end{lstlisting}
+ 
+A node in the \texttt{VISITING} state is one that is currently on the
+recursive call stack. Encountering such a node while traversing its own
+descendants means a back edge has been found, which is the defining
+characteristic of a cycle in a directed graph. Once all descendants of a node
+have been processed without finding a back edge, the node is marked
+\texttt{VISITED} and will not be re-explored. The outer loop ensures that all
+disconnected components --- if \texttt{findConnectedComponents} was bypassed
+--- are also checked.
+ 
+\subsubsection{Validation Ordering and Error Accumulation}
+ 
+The order in which the three validators run is not arbitrary. Table
+\ref{tab:validation-order} summarises the rationale for their sequence.
+ 
+\begin{table}[h!]
+\centering
+\begin{tabular}{clp{7.5cm}}
+  \toprule
+  \textbf{Order} & \textbf{Validator} & \textbf{Rationale} \\
+  \midrule
+  1 & \texttt{validateTriggerNodes}   &
+      Structural check. A component without a valid trigger root cannot be
+      executed at all, and a trigger node in the middle of a graph is a
+      logical error that makes the remaining checks meaningless. \\[6pt]
+  2 & \texttt{checkAllNodesValidation} &
+      Registry check. An unregistered node would cause the worker to throw at
+      runtime. Catching this statically produces a clearer error and avoids
+      wasting a job queue slot. \\[6pt]
+  3 & \texttt{checkCycles} &
+      Graph-theoretic check. Only runs when the graph is structurally sound.
+      A cyclic graph would cause \texttt{buildChildren} to recurse infinitely
+      and flood the job queue, so cycles must be rejected before deployment. \\
+  \bottomrule
+\end{tabular}
+\caption{Pre-execution validation order and rationale}
+\label{tab:validation-order}
+\end{table}
+ 
+Errors from the trigger and registry checks are accumulated independently and
+both reported if both fail. The cycle check is \textit{gated} behind the
+registry check: it only executes if all non-trigger nodes are registered, since
+a DFS over a graph that references unknown node types cannot be trusted to
+reflect the true structure of the intended workflow.
+ 
+Once the full validation result is returned to the workflow controller, any
+component listed in \texttt{invalidWorkflows} causes the entire deployment
+request to be rejected with a structured error payload identifying the
+problematic nodes and the reasons for failure.
+ 

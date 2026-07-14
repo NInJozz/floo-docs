@@ -1,0 +1,65 @@
+\chapter{Background, Related Work and Comparison}
+
+\section{Background}
+
+\subsection{Workflow Automation}
+Workflow automation refers to the process of defining and executing sequences of tasks automatically with minimal human intervention. Automation systems are widely used to reduce repetitive manual operations, improve consistency, and increase operational efficiency. Workflows are typically triggered either by specific events or by scheduled intervals, enabling systems to operate continuously and autonomously.
+
+Modern automation platforms allow users to connect multiple services and define logic that determines how data and actions flow between them. This approach improves scalability and reduces the complexity of managing interconnected systems.
+
+\subsection{Node-Based Workflow Architecture}
+Many contemporary automation systems adopt a node-based architecture in which each node represents a specific task or integration step. Nodes are connected to form workflows that define execution order and data flow.
+
+The node-based model provides modularity, reusability, and clarity, allowing users to build complex automation pipelines from simple components. This architecture also simplifies extensibility, since new functionality can be introduced through additional nodes without modifying the core system.
+
+\subsection{Scheduling and Periodic Execution}
+In addition to event-driven workflows, automation systems often require periodic execution of tasks. Scheduling mechanisms enable workflows to run at predefined intervals, supporting use cases such as data polling, system monitoring, report generation, and synchronization processes.
+
+Reliable scheduling is an essential component of workflow orchestration, as it allows automation systems to function independently over long periods without direct user interaction.
+
+\subsection{Extensible System Design}
+Extensibility is a key requirement for modern automation tools. A modular architecture allows the system to evolve over time by adding new integrations and capabilities. Designing workflows around interchangeable nodes enables future support for advanced functionalities such as intelligent processing or device interaction while preserving core stability.
+
+\section{Related Work}
+
+Several automation platforms have influenced the development of workflow orchestration systems. These platforms demonstrate different design philosophies and capabilities.
+
+\subsection{n8n}
+n8n is an open-source workflow automation platform that uses a node-based interface to connect various services. It provides flexibility and extensibility through customizable nodes and supports both event-based and scheduled workflows. However, advanced configurations may require technical knowledge.
+
+\subsection{Zapier}
+Zapier is a cloud-based automation service focused on simplicity and ease of use. It offers a large number of integrations and a user-friendly interface. Nevertheless, its closed architecture limits customization and extensibility compared to open-source alternatives.
+
+\subsection{Node-RED}
+Node-RED is a flow-based programming tool originally designed to connect hardware devices, APIs, and online services. It emphasizes visual programming and is commonly used in IoT scenarios. Although highly flexible, it may require additional configuration for complex workflow orchestration.
+
+\subsection{Apache Airflow}
+Apache Airflow is a workflow orchestration platform designed primarily for data engineering and pipeline scheduling. It provides powerful scheduling and monitoring capabilities, but targets technical users and large-scale workflows rather than lightweight automation scenarios.
+
+\section{Comparison of Existing Solutions}
+
+Table~\ref{tab:comparison} presents a comparison between the existing platforms and the proposed system.
+
+\begin{table}[h]
+\centering
+\caption{Comparison of Workflow Automation Platforms}
+\label{tab:comparison}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Feature} & \textbf{n8n} & \textbf{Zapier} & \textbf{Node-RED} & \textbf{Proposed System} \\ \hline
+Event-driven workflows & Yes & Yes & Yes & Yes \\ \hline
+Periodic scheduling & Yes & Limited & Yes & Yes \\ \hline
+Open architecture & Yes & No & Yes & Yes \\ \hline
+Ease of learning & Medium & High & Medium & High \\ \hline
+Extensible node system & Yes & Limited & Yes & Yes \\ \hline
+AI/IoT extensibility & Partial & Limited & Good & Planned \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Research Gap and Novelty}
+
+Existing automation platforms provide powerful capabilities to connect services and execute workflows. However, many of these solutions prioritize enterprise-scale features or advanced configurations, which can increase complexity for educational or experimental use.
+
+The analysis of previous work reveals a gap in systems that emphasize clarity of architecture, simplified workflow orchestration, and extensibility for future enhancements while maintaining a lightweight core design. 
+
+The novelty of the proposed system lies in presenting a modular automation architecture focused on workflow execution and scheduling as primary components, while intentionally enabling future extension through additional nodes such as artificial intelligence and IoT integrations. This approach balances simplicity and extensibility, making the system suitable for both learning purposes and practical experimentation.

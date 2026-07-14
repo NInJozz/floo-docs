@@ -1,0 +1,598 @@
+\section{Application Layer Implementation}
+\subsection{Middlewares}
+\subsubsection{Authentication Middleware}
+The \texttt{auth} middleware authenticates requests by verifying the JWT provided in the Authorization header. If the token is missing, it falls back to a query parameter for OAuth redirects. The \texttt{restrictTo} middleware provides fine-grained Role-Based Access Control (RBAC).
+
+\begin{lstlisting}
+export const auth = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    let token = req.headers.authorization;
+    if (!token && req.query.token) token = req.query.token as string;
+    if (!token) throw new AppError("Unauthorized.", 401);
+
+    const payload = jwt.verify(token, process.env.ACCESS_TOKEN_PRIVATE_KEY!);
+    (req as AuthRequest).id = (payload as any).id;
+    (req as AuthRequest).role = (payload as any).role;
+    next();
+  } catch (error) { next(error); }
+};
+
+export const restricTo = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!roles.includes((req as AuthRequest).role)) 
+        return next(new AppError("Forbidden.", 403));
+    next();
+  };
+};
+\end{lstlisting}
+
+\subsubsection{Error Handler Middleware}
+This middleware acts as a facade for the error registry. It maps caught exceptions to their appropriate handlers based on the \texttt{canHandle} criteria.
+
+\begin{lstlisting}
+export const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
+  const handler = errorHandlerRegistry.find(h => h.canHandle(err));
+  if (handler) return handler.handle(err, res);
+};
+\end{lstlisting}
+
+\subsubsection{Verification Middleware}
+The \texttt{restrictToVerified} middleware checks the \texttt{isVerified} status on the request object, ensuring only accounts with confirmed emails can access protected features.
+
+\begin{lstlisting}
+export const restrictToVerified = (req: Request, res: Response, next: NextFunction) => {
+  if (!(req as AuthRequest).isVerified) {
+    throw new AppError("Please verify your email to access this feature.", 403);
+  }
+  next();
+};
+\end{lstlisting}
+
+\subsubsection{JSend Middleware}
+The \texttt{jsend} middleware standardizes outgoing API responses by attaching helper methods (\texttt{success}, \texttt{fail}, \texttt{error}) to the Express \texttt{Response} object.
+
+\begin{lstlisting}
+export function jsend(req: Request, res: Response, next: NextFunction) {
+  res.jsend = {
+    success: (msg, code = 200, data = null) => 
+        res.status(code).json({ status: "success", message: msg, data }),
+    fail: (msg, code = 400, data = null) => 
+        res.status(code).json({ status: "fail", message: msg, data}),
+    error: (msg, code = 500, data = null) => 
+        res.status(code).json({ status: "error", message: msg, code, data }),
+  };
+  next();
+}
+\end{lstlisting}
+
+\subsubsection{Rate Limiter Middleware}
+This factory function generates IP-based rate limiters with configurable time windows and request maximums, throwing a \texttt{429 Too Many Requests} error when limits are exceeded.
+
+\begin{lstlisting}
+export const createRateLimiter = (minutes = 15, max = 100, message = "Too many requests.") => {
+  return rateLimit({
+    windowMs: minutes * 60 * 1000,
+    max,
+    handler: (req, res, next) => next(new AppError(message, 429)),
+  });
+};
+\end{lstlisting}
+
+\subsubsection{Upload Middleware}
+The \texttt{uploadMiddleware} configures \texttt{multer} to handle multipart form data, specifically optimized for file uploads with a 5MB size limit per file.
+
+\begin{lstlisting}
+const multerUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+export const uploadMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  multerUpload.array("files", 50)(req, res, (err) => {
+    if (err instanceof multer.MulterError) return next(new AppError(err.message, 400));
+    else if (err) return next(err);
+    next();
+  });
+};
+\end{lstlisting}
+
+\subsubsection{Validation Middleware}
+The \texttt{validateRequest} middleware executes the results of the \texttt{express-validator} checks. If validation fails, it aggregates the errors and propagates them as a \texttt{422 Unprocessable Entity} exception.
+
+\begin{lstlisting}
+export const validateRequest = (req: Request, res: Response, next: NextFunction) => {
+  const result = validationResult(req);
+  if (!result.isEmpty()) {
+    const errors = result.array().map(err => err.msg);
+    return next(new AppError('Validation errors', 422, errors));
+  }
+  next();
+};
+\end{lstlisting}
+
+\subsection{Validation Layer}
+
+Request validation is abstracted into its own layer using \texttt{express-validator}. Before a request payload is processed, it is checked against strict schemas to ensure data integrity and type safety. This ``fail-fast'' approach guarantees that the underlying controllers and services do not need to perform redundant sanity checks on incoming data .
+
+\subsubsection{Authentication Validators}
+These validators enforce security policies for user sessions and account recovery.
+\begin{lstlisting}[caption={Authentication validation schemas}]
+// auth.validators.ts
+export const registerValidators = [
+  body('email').notEmpty().withMessage('Empty email').isEmail(),
+  body('password').isStrongPassword({ minLength: 8, ... }),
+  body('firstName').isLength({ min: 3, max: 15 }),
+  body('lastName').isLength({ min: 3, max: 15 })
+];
+
+export const loginValidators = [
+  body('email').notEmpty().isEmail(),
+  body('password').notEmpty()
+];
+
+export const verifyEmailValidators = [
+  body('email').notEmpty().isEmail(),
+  body('code').notEmpty().isNumeric()
+];
+
+export const resetCodeValidators = [
+  body('email').notEmpty().isEmail(),
+  body('resetCode').notEmpty().isNumeric(),
+  body('password').notEmpty().isStrongPassword(...)
+];
+\end{lstlisting}
+
+\subsubsection{Credential Validators}
+These ensure that credential definitions maintain proper parameter structures and validation constraints.
+\begin{lstlisting}[caption={Credential type validation schema}]
+// credential.validator.ts
+export const createCredentialTypeValidators = [
+  body('title').isLength({ min: 1, max: 100 }),
+  body('parameters').isArray({ min: 1 }),
+  body('parameters.*.title').isLength({ min: 1, max: 100 }),
+  body('parameters.*.maxChar').optional().isInt({ min: 1 }),
+  body('parameters.*.isSensitive').optional().isBoolean()
+];
+\end{lstlisting}
+
+\subsubsection{Project Validators}
+Project management routes utilize these validators to constrain metadata and versioning data.
+\begin{lstlisting}[caption={Project creation and update validation}]
+// project.validators.ts
+export const createProjectValidators = [
+  body('name').notEmpty().isLength({ min: 1, max: 50 }),
+  body('description').optional().isLength({ min: 1, max: 200 }),
+  body('type').notEmpty(),
+  body('versionId').optional().isNumeric()
+];
+
+export const updateProjectValidators = [
+  body('name').optional().isLength({ min: 1, max: 50 }),
+  body('description').optional().isLength({ min: 1, max: 200 }),
+  body('type').optional().isLength({ min: 1 }),
+  body('versionId').optional().isNumeric()
+];
+\end{lstlisting}
+
+\subsubsection{User Validators}
+These validators secure user profile modifications, preventing invalid name formats, unauthorized email changes, or weak password updates.
+\begin{lstlisting}[caption={User profile and account validation}]
+// user.validators.ts
+export const updateProfileValidators = [
+  body('firstName').optional().isLength({ min: 3, max: 15 }),
+  body('lastName').optional().isLength({ min: 3, max: 15 }),
+  body('personalizations').optional().isObject()
+];
+
+export const updateEmailValidators = [
+  body('email').notEmpty().isEmail()
+];
+
+export const updatePassword = [
+  body('password').notEmpty().isStrongPassword(...)
+];
+\end{lstlisting}
+
+\subsection{Services}
+\subsubsection{Email and Notification Services}
+
+\paragraph{Overview}
+The email subsystem is designed to handle automated communications, such as user verification and password reset flows, in a decoupled and highly maintainable manner. It separates the concerns of email configuration, template management, and transport, allowing the application to add new email types or switch transport providers without modifying the core business logic.
+
+\paragraph{Email Service Layer}
+The email service layer relies on a modular architecture located in \texttt{backend/src/api/services/email/}, comprising four distinct components that manage the full lifecycle of an outgoing message.
+
+\subparagraph{Email Configuration}
+The \texttt{email.config.ts} file serves as a centralized registry for all email types supported by the system. By mapping an \texttt{EmailType} to its specific subject and HTML template, the system ensures consistent messaging and simplifies the addition of new email types.
+
+\begin{lstlisting}[caption={Email configuration registry (\texttt{email.config.ts})}]
+export const emailConfig = {
+  verify: {
+    subject: "Verify your email",
+    template: "verify-email",
+  },
+  reset: {
+    subject: "Reset your password",
+    template: "reset-password",
+  },
+};
+
+export type EmailType = keyof typeof emailConfig;
+\end{lstlisting}
+
+\subparagraph{Template Loader}
+The \texttt{templateLoader.ts} utility abstracts the filesystem operations required to handle HTML templates. It provides two core functions: \texttt{loadTemplate}, which retrieves raw HTML from the \texttt{templates/} directory, and \texttt{renderTemplate}, which performs string interpolation to inject dynamic data (such as OTP codes or user names) into the templates before sending.
+
+\subparagraph{Transporter}
+The \texttt{transporter.ts} file encapsulates the initialization of the Nodemailer transport mechanism. By isolating this logic, the system allows for the configuration of various SMTP drivers or API-based mail providers (e.g., SendGrid, Mailgun) in a single location, which the \texttt{email.service.ts} consumes to perform the actual network dispatch.
+
+\subparagraph{Email Service}
+The \texttt{email.service.ts} acts as the primary orchestrator for the email subsystem. It exposes a single, clean function, \texttt{sendEmail}, which accepts the email type and dynamic data, looks up the configuration, renders the template, and invokes the transporter.
+
+\begin{lstlisting}[caption={Email service orchestration (\texttt{email.service.ts})}]
+export const sendEmail = async (
+  type: EmailType,
+  to: string,
+  data: Record<string, string>
+) => {
+  // Get the email configuration for the specified type
+  const config = emailConfig[type];
+
+  const rawTemplate = loadTemplate(config.template);
+  const html = renderTemplate(rawTemplate, data);
+
+  // Send the email using the transporter
+  await transporter.sendMail({
+    to,
+    subject: config.subject,
+    html,
+  });
+};
+\end{lstlisting}
+
+\paragraph{SMTP Service}
+While the \seqsplit\texttt{{email.service.ts}} handles templated system emails, the \seqsplit\texttt{{smtp.service.ts}} (located in {\seqsplit\texttt{backend/src/api/services/ }}) provides a lower-level, credential-based interface for sending arbitrary emails. This is critical for features where users must provide their own SMTP credentials (e.g., connecting a personal Gmail or Outlook account to an automation node).
+
+The service handles the secure retrieval of encrypted SMTP credentials from the database, the construction of a dynamic Nodemailer transporter, and the execution of the mail send process.
+
+\begin{lstlisting}[caption={SMTP execution flow (\texttt{smtp.service.ts})}]
+export async function sendEmailSMTP(
+  smtpData: SmtpCredentialData,
+  emailParams: SmtpEmailParams,
+) {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: smtpData.host,
+      port: smtpData.port,
+      secure: smtpData.secure,
+      auth: {
+        user: smtpData.username,
+        pass: smtpData.password,
+      },
+    });
+
+    await transporter.sendMail({
+      from: smtpData.username,
+      to: emailParams.to,
+      subject: emailParams.subject,
+      text: emailParams.body,
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    throw new AppError(`Failed to send email: ${error.message}`, 500);
+  }
+}
+
+
+\end{lstlisting}
+\subsubsection{Cloud and AI Services}
+
+\paragraph{Cloudinary Service}
+The Cloudinary service acts as the primary storage layer for the platform, handling file uploads and asset management. It leverages Node.js streams to pipe file buffers directly to Cloudinary's infrastructure, ensuring efficient memory usage.
+
+\subparagraph{Uploading Assets}
+The \texttt{uploadToCloudinary} function encapsulates the logic for streaming file buffers. By using \texttt{cloudinary.uploader.upload\_stream}, the system avoids loading large files entirely into RAM, which is critical for system stability.
+
+\begin{lstlisting}[caption={Cloudinary upload logic (\texttt{cloudinary.service.ts})}]
+export const uploadToCloudinary = async (folder: string, fileBuffer: Buffer): Promise<UploadResult> => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: "auto",
+        use_filename: true,
+        unique_filename: false,
+        overwrite: true,
+      },
+      (error, result) => {
+        if (error) {
+          reject(new AppError(`Upload failed: ${error.message}`, 500));
+        } else {
+          resolve({
+            url: result!.secure_url,
+            publicId: result!.public_id,
+          });
+        }
+      }
+    );
+    stream.end(fileBuffer);
+  });
+};
+\end{lstlisting}
+
+\subparagraph{Resource Deletion}
+Cloudinary requires an explicit \texttt{\seqsplit{resource\_type}} for deletion (e.g., "image", "video", "raw"). The service includes a helper function, \texttt{\seqsplit{toCloudinaryResourceType}}, which derives this type from the asset's MIME type to ensure compatibility with Cloudinary's API requirements.
+
+\paragraph{AI and LLM Services}
+The AI infrastructure is bifurcated into a lightweight SDK wrapper (\texttt{groq.service.ts}) and a high-level service layer (\texttt{LLMChat.service.ts}) that orchestrates message formatting and prompt execution.
+
+\subparagraph{Groq Integration}
+The \texttt{groq.service.ts} initializes the Groq SDK with the required API key from the environment. This serves as a singleton instance used throughout the backend for interacting with LLM models.
+
+\subparagraph{LLMChat Service}
+The \texttt{LLMChat.service.ts} provides a simplified, polymorphic interface for the chat completion API. It supports function overloading, allowing developers to generate a reply either from a simple string or from a fully formed array of conversation messages.
+
+\begin{lstlisting}[caption={LLM Chat service with polymorphic input (\texttt{LLMChat.service.ts})}]
+// overload signatures
+export async function generateReply(messages: Message[]): Promise<string>; 
+export async function generateReply(message: string): Promise<string>; 
+
+// implementation
+export async function generateReply(input: Message[] | string): Promise<string> {
+  const messages: Message[] =
+    typeof input === "string"
+      ? [{ role: "user", content: input }]
+      : input;
+
+  const response = await groq.chat.completions.create({
+    model: "openai/gpt-oss-120b", 
+    messages,
+  });
+
+  return response.choices[0]?.message?.content || "";
+}
+\end{lstlisting}
+
+This abstraction ensures that the business logic can consume AI responses without needing to handle the complexity of message formatting or model-specific configuration.
+
+\subsubsection{Execution and Node Management Services}
+
+\paragraph{Workflow Service}
+The Workflow service is responsible for the orchestration and deployment lifecycle of project workflows. It acts as the bridge between the API controller and the execution engine.
+
+\subparagraph{Workflow Execution Lifecycle}
+The \texttt{\seqsplit{executeProjectWorkflow}} function in \texttt{\seqsplit{workflow.service.ts}} handles the complete lifecycle of a workflow execution. It performs the following orchestration steps:
+
+\begin{enumerate}
+    \item \textbf{Ownership \& State Validation}: Verifies the project existence, authorization, and ensures the project is not already deployed.
+    \item \textbf{Graph Construction}: Invokes \texttt{getWorkflowGraph} to compile the raw JSON workflow payload into a structured \texttt{WorkflowGraph} instance.
+    \item \textbf{Pre-Execution Validation}: Validates the compiled graph to ensure there are no disconnected nodes or invalid sub-workflows using \texttt{validateAllWorkflows}.
+    \item \textbf{Deployment}: Updates the project status in the database and triggers the execution engine via \texttt{enqueueTriggerNodes}.
+\end{enumerate}
+
+
+
+\paragraph{Node Registry Service}
+The Node Registry service, defined in \texttt{nodes.service.ts}, provides a lightweight interface for the frontend to discover available automation nodes.
+
+\subparagraph{Registry Discovery}
+The service leverages the \texttt{NodeRegistry} singleton to retrieve all available node classes. It processes these into a consumable format for the frontend UI:
+
+\begin{lstlisting}[caption={Node retrieval logic (\texttt{nodes.service.ts})}]
+export const getNodesFromRegistry = () => {
+    const registry = NodeRegistry.getInstance();
+    const nodes = registry.getAllnodes();
+    const nodeDescriptions: any[] = [];
+    for (const [key, NodeClass] of nodes) {
+      const description = (NodeClass as any).description;
+      nodeDescriptions.push({
+          ...description,
+          url: `https://res.cloudinary.com/dwtdta9o3/image/upload/${description.name}.png`
+      });
+    }
+    return nodeDescriptions;
+}
+\end{lstlisting}
+
+This approach ensures that the frontend dynamically receives accurate node metadata, including display names, categories, and icon URLs, without hardcoding these values in the client-side application.
+
+\paragraph{Node Output Service}
+The Node Output service (\texttt{nodeoutput.service.ts}) manages the storage and persistence of files generated by nodes during execution.
+
+\subparagraph{File Handling and Persistence}
+The service enforces strict validation rules—limiting file size to 5MB and a maximum of 50 files per request—before initiating the storage process.
+
+\begin{itemize}
+    \item \textbf{Storage}: It iterates through the provided file buffer array and uses the \texttt{\seqsplit{uploadToCloudinary}} helper to store assets in a structured directory path: \texttt{\seqsplit{users/{userId}/projects/{projectId}/outputs/execution/{executionId}/{nodeId}}}
+    \item \textbf{Database Persistence}: Upon successful cloud upload, the service creates a record in the \texttt{NodeOutput} database table, linking the Cloudinary public ID and secure URL to the specific execution and node context.
+\end{itemize}
+
+This atomic orchestration ensures that every file tracked by the database is correctly backed by physical storage, maintaining data integrity for execution logs.
+
+
+\subsubsection{Payment and Integration Services}
+
+\paragraph{Paymob Integration Flow}
+The \texttt{PaymobService} abstracts the complexity of the Paymob payment gateway. Initiating a payment follows a strict three-step sequence:
+\begin{enumerate}
+    \item \textbf{Authentication}: Generates an authentication token using the configured \texttt{\seqsplit{PAYMOB\_API\_KEY}}.
+    \item \textbf{Order Registration}: Registers the checkout details and requested amount to receive a provider-specific Paymob Order ID.
+    \item \textbf{Payment Key Generation}: Generates a secure payment token bound to the integration ID and user billing data, which is then passed to the frontend to render the payment iframe.
+\end{enumerate}
+
+\paragraph{Webhook Processing and Security}
+The payment webhook acts as the automated fulfillment mechanism for the platform, ensuring secure and atomic operations:
+\begin{itemize}
+    \item \textbf{Security and Idempotency}: The payload's authenticity is strictly verified via \texttt{verifyPaymobHmac}, which calculates a SHA-512 HMAC using a lexographical string of the payload parameters. Duplicate webhook events are safely ignored by querying the \texttt{Transaction} table for an existing \texttt{paymobTransactionId}.
+    \item \textbf{Fulfillment Transaction}: Post-verification fulfillment runs entirely inside a Prisma transaction. It logs the transaction, updates the order status to \texttt{PAID}, and issues \texttt{Entitlement} records for purchased nodes. 
+    \item \textbf{Template Cloning Logic}: If a purchased product is of type \texttt{TEMPLATE}, the service fetches the master \texttt{Project} and spawns a complete, independent copy for the buyer. This new project retains the original workflow logic and description but transfers ownership to the purchasing user, setting its deployment status to false.
+\end{itemize}
+\paragraph{Paymob HMAC Security Utility}
+The \texttt{paymobHmac.util} module is the critical security layer for processing payment webhooks. Because webhook requests come from an external gateway, the system must verify that the payload has not been tampered with and truly originated from Paymob.
+
+The utility performs this verification by:
+\begin{itemize}
+    \item \textbf{Lexographical Concatenation}: It gathers twenty specific parameters from the Paymob payload (including IDs, amounts, and status flags) and joins them into a single string in a strict, pre-defined order.
+    \item \textbf{Cryptographic Hashing}: It uses \texttt{crypto.createHmac} with the 'sha512' algorithm, utilizing your server-side \texttt{PAYMOB\_HMAC\_SECRET} to hash the concatenated string.
+    \item \textbf{Signature Comparison}: The resulting hexadecimal digest is compared against the HMAC signature provided in the webhook's query parameters. If they do not match, the system rejects the request as unauthorized, preventing potential payment fraud.
+\end{itemize}
+
+\subsection{Authentication Strategies}
+
+\subsubsection{Overview}
+The strategies layer encapsulates interchangeable authentication algorithms and service integrations using the Passport.js framework. This layer acts as the interface between the platform and external identity providers (IdPs) or service APIs, normalizing disparate authentication protocols into a unified internal workflow. By isolating these integrations, the platform can easily scale support for new services without modifying core business logic.
+
+\subsubsection{OAuth Identity Providers}
+The system implements three primary OAuth authentication strategies: Discord, GitHub, and Google. While each interacts with a different service provider, they adhere to a consistent internal contract defined by the following execution flow:
+
+\begin{enumerate}
+    \item \textbf{Identity Verification}: Upon callback, the strategy queries the \texttt{\seqsplit{AuthIdentityProvider}} table in the database to determine if the provider-specific ID is already linked to an existing system user.
+    \item \textbf{User Upsert}: If no valid identity exists, the logic attempts to match the provider email against existing user records. 
+    \begin{itemize}
+        \item If a match is found, the strategy updates the existing account to link the new provider ID.
+        \item If no match is found, a new user record is created with the default role of 'USER'.
+    \end{itemize}
+    \item \textbf{Audit Logging}: Every authentication attempt (successful or erroneous) is recorded in the \texttt{AuthHistory} table, which tracks the provider type, status, and error details for security monitoring.
+\end{enumerate}
+
+\begin{lstlisting}[caption={Common OAuth identity logic (Discord Strategy)}]
+// discord.strategy.ts
+const findAuth = await prisma.authIdentityProvider.findUnique({
+  where: { provider: "discord", providerId: profile.id },
+  include: { user: true },
+});
+
+// Update or create user flow
+if (!findAuth || findAuth.user.disabled) {
+    const existingUser = await prisma.user.findUnique({ 
+        where: { email }, 
+        include: { authIdentities: true } 
+    });
+    // Link identity or create new user...
+}
+\end{lstlisting}
+
+\subsubsection{Google Sheets Integration}
+The Google Sheets strategy differs from the standard OAuth providers; it is a service-based strategy rather than an authentication-only strategy. Its primary responsibility is the secure management of third-party API credentials.
+
+\paragraph{Credential Management}
+This strategy handles the extraction of tokens during the OAuth callback and manages their persistence using the \texttt{userCredentialSet} and \texttt{userCredentialValue} models.
+
+A critical requirement of this strategy is the security of stored tokens. The strategy explicitly invokes the encryption utility layer before persisting data to the database, ensuring that sensitive access and refresh tokens are never stored in plain text.
+
+\begin{lstlisting}[caption={Credential encryption and storage flow}]
+// googleSheet.strategy.ts
+const encryptedAccessToken = encrypt(accessTokenValue);
+await upsertCredentialValue(
+    credentialSet.id, 
+    accessTokenParam.id, 
+    encryptedAccessToken
+);
+
+if (refreshTokenValue && refreshTokenParam) {
+  const encryptedRefreshToken = encrypt(refreshTokenValue);
+  await upsertCredentialValue(
+      credentialSet.id, 
+      refreshTokenParam.id, 
+      encryptedRefreshToken
+  );
+}
+\end{lstlisting}
+
+This architectural choice separates the concerns of account authentication from resource delegation, allowing the platform to maintain secure, persistent access to external resources like Google Sheets on behalf of the user.
+\subsection{Types}
+TypeScript interfaces and type definitions form the foundational contract of the application. This layer defines the exact shape of data structures used across the system, ensuring strict compile-time safety and catching structural mismatches between the frontend payloads, the internal API representation, and the execution engine.
+
+\subsubsection{Authentication Request (\texttt{authRequest.type.ts})}
+This interface extends the standard Express \texttt{Request} object to inject custom user context. It is used by authentication middlewares to propagate identity information, including the user's unique identifier, role (used for RBAC), email, and their verification status throughout the request lifecycle.
+
+\begin{lstlisting}[caption={Authentication Request Interface}]
+import { Request } from 'express';
+
+export interface AuthRequest extends Request {
+  id: string;
+  role: string;
+  email: string;
+  isVerified: boolean;
+}
+\end{lstlisting}
+
+\subsubsection{Google OAuth Profile (\texttt{googleProfile.type.ts})}
+This interface standardizes the data structure returned by the Passport.js Google OAuth strategy. It maps the raw profile information into a typed object, allowing the application to securely extract user details like email, name, and locale during the OAuth callback process.
+
+\begin{lstlisting}[caption={Google OAuth Profile Interface}]
+import { Profile } from "passport";
+
+export interface GoogleProfile extends Profile {
+  _json: {
+    sub: string;
+    email: string;
+    email_verified: boolean;
+    name: string;
+    given_name: string;
+    family_name: string;
+    picture: string;
+    locale: string;
+  };
+}
+\end{lstlisting}
+
+\subsection{Utils}
+The \texttt{utils} directory houses pure, stateless helper functions shared across multiple layers of the application. By centralizing these cryptographic and session-related operations, the platform prevents code duplication and ensures that critical security logic is handled consistently.
+
+\subsubsection{Hashing Utilities (\texttt{hash.util.ts})}
+This utility abstracts password and data hashing using \texttt{bcryptjs}. It provides two asynchronous methods: \texttt{hash} to securely salt and hash strings (utilizing environment-configured salt rounds), and \texttt{compareHash} to verify plain-text inputs against existing hashes. This ensures that sensitive credentials are never stored in plaintext.
+
+\begin{lstlisting}[caption={Hashing and Comparison Utility}]
+import bcrypt from 'bcryptjs'
+
+const SALT_ROUNDS = Number(process.env.SALT_ROUNDS) || 10;
+
+// Hash value
+export const hash = async (value: string) => {
+  return await bcrypt.hash(value!, SALT_ROUNDS)
+}
+
+// Compare unhashed with hashed value
+export const compareHash = async (value: string, hashed: string) => {
+  return bcrypt.compare(value, hashed);
+};
+\end{lstlisting}
+
+\subsubsection{JWT Token Management (\texttt{jwtTokens.util.ts})}
+This utility manages the application's authentication lifecycle by signing JSON Web Tokens (JWT). It generates both a short-lived access token (2 hours) and a long-lived refresh token (14 days), both containing essential user metadata (ID, email, role, verification status) protected by environment-specific private keys.
+
+\begin{lstlisting}[caption={Token Generation Utility}]
+import jwt from 'jsonwebtoken'
+
+// Function to generate access and refresh tokens for login
+export const generateTokens = (userId: string, userEmail: string, userRole: string, isVerified: boolean) => {
+
+  const accessToken = jwt.sign(
+    { id: userId, email: userEmail, role: userRole, isVerified },
+    process.env.ACCESS_TOKEN_PRIVATE_KEY!,
+    { expiresIn: "2h" }
+  );
+
+  const refreshToken = jwt.sign(
+    { id: userId, email: userEmail, role: userRole, isVerified },
+    process.env.REFRESH_TOKEN_PRIVATE_KEY!,
+    { expiresIn: "14d" }
+  );
+
+  return { accessToken, refreshToken };
+}
+\end{lstlisting}
+
+\subsubsection{OTP Generation (\texttt{otp.util.ts})}
+This utility leverages \texttt{otplib} to handle one-time password (OTP) generation. It is primarily used during account registration, email updates, and password reset flows to generate time-sensitive tokens sent to the user's email, ensuring verification is authenticated and secure.
+
+\begin{lstlisting}[caption={OTP Generation Utility}]
+import { authenticator } from "otplib";
+
+export const generateOtp = async () => {
+  const secret = authenticator.generateSecret();
+  return authenticator.generate(secret);
+}
+\end{lstlisting}

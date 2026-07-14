@@ -103,7 +103,7 @@ Regardless of which pattern a node uses, \texttt{execute()} always resolves to a
 
 \subsection{Schema Compatibility}
 
-Full ERD rationale is in Subsection~\ref{subsec:data-layer-architecture}; briefly, the existing schema needs no changes to support this feature:
+Briefly, the existing schema needs no changes to support this feature:
 
 \begin{itemize}
   \item Splitting \texttt{NodeInput}/\texttt{NodeOutput} into distinct models mirrors the two independent flows (pre-execution attachment vs.\ post-execution artifact), avoiding a discriminator column and letting each evolve its own indexing.

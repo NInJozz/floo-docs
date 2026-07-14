@@ -8,7 +8,7 @@ The Data Ingest node is the pipeline's single point of entry: it is the only nod
 
 Its responsibilities are to (i) load a single source file, or merge multiple files from a folder, into one flat table; (ii) flatten nested JSON/JSONL structures; (iii) validate the result is non-empty; (iv) persist the dataset as Parquet together with a descriptive metadata artifact; and (v) register both artifact paths in the shared \texttt{manifest.json} so downstream nodes can locate them without knowing how they were produced.
 
-The node is driven entirely by \texttt{user\_config.json}, exposing two mutually exclusive modes: \textbf{file mode} (CSV, Excel, JSON, or JSONL, with format-specific options such as delimiter, sheet, and encoding) and \textbf{folder mode} (every file matching a filename prefix is merged, Section~\ref{subsec:data-ingest-mechanics}). Every failure mode is surfaced through a dedicated, typed exception (\texttt{ConfigError}, \texttt{SourceNotFoundError}, \texttt{EmptyDatasetError}, \texttt{FlattenLimitExceededError}, etc.) rather than a generic library exception, so an orchestrator can react to specific failure classes without parsing error strings --- a convention every node in this chapter follows.
+The node is driven entirely by \texttt{user\_config.json}, exposing two mutually exclusive modes: \textbf{file mode} (CSV, Excel, JSON, or JSONL, with format-specific options such as delimiter, sheet, and encoding) and \textbf{folder mode} (every file matching a filename prefix is merged. Every failure mode is surfaced through a dedicated, typed exception (\texttt{ConfigError}, \texttt{SourceNotFoundError}, \texttt{EmptyDatasetError}, \texttt{FlattenLimitExceededError}, etc.) rather than a generic library exception, so an orchestrator can react to specific failure classes without parsing error strings --- a convention every node in this chapter follows.
 
 \subsection{Key Mechanics}
 \label{subsec:data-ingest-mechanics}
@@ -38,7 +38,7 @@ Key decisions: (1) a declarative, stateless configuration keeps runs reproducibl
 \subsection{Purpose, Responsibilities, and Configuration}
 \label{subsec:cleaning-overview}
 
-The Cleaning node consumes Data Ingest's output and applies a fixed, deterministic eight-step sanitization pipeline (Table~\ref{tab:cleaning-steps-brief}), producing a consistently typed dataset for the Analyzer and Split nodes. Like Data Ingest, its input is resolved dynamically through the manifest rather than a configured path, decoupling it from whatever upstream source was actually used.
+The Cleaning node consumes Data Ingest's output and applies a fixed, deterministic eight-step sanitization pipeline, producing a consistently typed dataset for the Analyzer and Split nodes. Like Data Ingest, its input is resolved dynamically through the manifest rather than a configured path, decoupling it from whatever upstream source was actually used.
 
 \begin{table}[H]
 \centering

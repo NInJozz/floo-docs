@@ -1,0 +1,157 @@
+\documentclass[a4paper,12pt]{report}
+
+%====================================================
+% Packages
+%====================================================
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption} % حزمة أساسية لدمج الصور الفرعية بجانب بعضها
+\usepackage{amsmath}
+
+%====================================================
+% Chapter Style
+%====================================================
+\titleformat{\chapter}[display]
+{\normalfont\Huge\bfseries}
+{}{0pt}{\Huge}
+
+\titlespacing*{\chapter}{0pt}{-40pt}{20pt}
+
+%====================================================
+% تقليل المسافات الافتراضية حول الجداول والصور لمنع الفراغات البيضاء
+%====================================================
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}       % المسافة بين صورتين عائمتين
+\setlength{\textfloatsep}{10pt plus 2pt minus 4pt}  % المسافة بين الصورة والنص (أعلى/أسفل الصفحة)
+\setlength{\intextsep}{10pt plus 2pt minus 2pt}     % المسافة حول الصورة المدمجة وسط النص
+\setcounter{totalnumber}{4}                         % السماح بوجود حتى 4 صور في الصفحة الواحدة
+
+%====================================================
+
+\begin{document}
+
+%====================================================
+\chapter*{Text Guided Object detection}
+\addcontentsline{toc}{chapter}{Testing and Results}
+\label{chap:testing-results}
+
+The proposed Text-Guided Object Detection model was evaluated using both quantitative performance metrics and qualitative visual inspection. The evaluation aims to verify the model's capability to accurately localize target objects specified by natural language prompts while maintaining stable learning behavior during training.
+
+The following sections present the training performance, evaluation metrics, dataset statistics, and qualitative detection examples.
+
+%====================================================
+
+\section{Training Performance}
+
+Figure~\ref{fig:training} presents the overall training process. The training and validation losses decrease steadily throughout the epochs, indicating successful convergence without noticeable overfitting. The evaluation metrics also improve consistently as training progresses.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{Images/results.png} % تقليل الحجم قليلاً ليتناسب مع نفس الصفحة
+\caption{Training and validation losses together with evaluation metrics.}
+\label{fig:training}
+\end{figure}
+
+%====================================================
+
+\section{Evaluation Curves}
+
+The performance of the detector was evaluated across various confidence thresholds. Figure~\ref{fig:all_curves} illustrates the comprehensive analysis of Precision, Recall, and F1-score transitions.
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[b]{0.47\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Images/PR_curve.png}
+    \caption{Precision--Recall Curve.}
+    \label{fig:pr_curve}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.47\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Images/P_curve.png}
+    \caption{Precision--Confidence Curve.}
+    \label{fig:p_curve}
+\end{subfigure}
+
+\vspace{1em} % مسافة صغيرة لفصل الصفين
+
+\begin{subfigure}[b]{0.47\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Images/R_curve.png} % تم تعديلها هنا لـ R_curve بدلاً من تكرار P_curve
+    \caption{Recall--Confidence Curve.}
+    \label{fig:r_curve}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.47\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Images/F1_curve.png}
+    \caption{F1--Confidence Curve.}
+    \label{fig:f1_curve}
+\end{subfigure}
+\caption{Detailed model evaluation curves under different confidence thresholds.}
+\label{fig:all_curves}
+\end{figure}
+
+%====================================================
+
+\section{Confusion Matrices}
+
+The confusion matrices summarize the classification performance of the detector. Figure~\ref{fig:confusion_matrices} displays both the raw and normalized values, indicating that the majority of detected objects were correctly classified along the main diagonal.
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Images/confusion_matrix_T.png}
+    \caption{Raw Confusion Matrix.}
+    \label{fig:cm_raw}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{Images/confusion_matrix_normalized.png}
+    \caption{Normalized Confusion Matrix.}
+    \label{fig:cm_norm}
+\end{subfigure}
+\caption{Confusion matrices evaluating classification performance.}
+\label{fig:confusion_matrices}
+\end{figure}
+
+%====================================================
+
+\section{Dataset Statistics}
+
+Figure~\ref{fig:labels} summarizes the dataset distribution used during training. The plots illustrate the number of object instances, class distribution, bounding-box sizes, and spatial locations of labeled objects.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{Images/labels.jpg}
+\caption{Dataset statistics and object distribution.}
+\label{fig:labels}
+\end{figure}
+
+%====================================================
+
+\section{Qualitative Detection Results}
+
+The proposed Text-Guided Object Detection model receives two inputs: an image and a textual prompt describing the target object. Instead of detecting all objects within the scene, the model identifies only the object corresponding to the given text query and generates its bounding box.
+
+Figure~\ref{fig:detection} demonstrates an example where the model successfully localizes the requested object while ignoring unrelated objects in the same image.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{Images/example_detection.png}
+\caption{Example of text-guided object detection.}
+\label{fig:detection}
+\end{figure}
+
+%====================================================
+
+\end{document}

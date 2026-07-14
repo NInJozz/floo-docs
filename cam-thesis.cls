@@ -365,6 +365,20 @@ for the degree of Doctor of Philosophy%
 \begin{lrbox}{\cam@logo}
 \end{lrbox}
 
+
+\begin{center}
+\begin{minipage}{0.45\textwidth}
+    \centering
+    \includegraphics[width=0.6\textwidth]{CollegeShields/ZagazigUniversity.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\textwidth}
+    \centering
+    \includegraphics[width=0.6\textwidth]{CollegeShields/FacultyOfEngineering.png}
+\end{minipage}
+\end{center}
+
+
 %% THESIS TITLE box
 \newsavebox{\cam@title}
 \begin{lrbox}{\cam@title}

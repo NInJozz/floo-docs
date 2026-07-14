@@ -1,0 +1,116 @@
+\documentclass[a4paper,12pt]{report}
+
+%====================================================
+% Packages
+%====================================================
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath}
+
+%====================================================
+% Caption Style
+%====================================================
+\captionsetup{justification=centering}
+\captionsetup[subfigure]{justification=centering}
+
+%====================================================
+% Chapter Style
+%====================================================
+\titleformat{\chapter}[display]
+{\normalfont\Huge\bfseries}
+{}{0pt}{\Huge}
+
+\titlespacing*{\chapter}{0pt}{-55pt}{8pt}
+
+%====================================================
+% Reduce white spaces
+%====================================================
+\setlength{\floatsep}{5pt}
+\setlength{\textfloatsep}{8pt}
+\setlength{\intextsep}{8pt}
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{0pt}
+
+\begin{document}
+
+\chapter*{single object image classification}
+\addcontentsline{toc}{chapter}{Testing and Results}
+\label{chap:testing-results}
+
+The proposed Single-Object Image Classification model was evaluated using quantitative performance metrics and qualitative testing through a deployed inference API. The evaluation demonstrates both the learning capability of the proposed CNN model during training and its effectiveness in classifying unseen real-world images.
+
+%====================================================
+
+\section{Training Performance}
+
+The CNN model was trained for 100 epochs using categorical cross-entropy loss. Figure~\ref{fig:training_curves} shows the training and validation accuracy together with the corresponding loss curves. The accuracy increases steadily while both losses decrease, indicating stable convergence without noticeable overfitting.
+
+\begin{figure}[H]
+\centering
+
+\begin{subfigure}{0.47\textwidth}
+\centering
+\includegraphics[width=\linewidth]{Images/Test&Result/model_accuracy.png}
+\caption{Training and Validation Accuracy}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.47\textwidth}
+\centering
+\includegraphics[width=\linewidth]{Images/Test&Result/model_loss.png}
+\caption{Training and Validation Loss}
+\end{subfigure}
+
+\caption{Training performance of the proposed CNN model.}
+\label{fig:training_curves}
+\end{figure}
+
+%====================================================
+
+\section{Confusion Matrix}
+
+The confusion matrix provides a detailed evaluation of the classification performance for every object class. Most predictions appear along the main diagonal, indicating that the proposed model correctly classified the majority of testing samples with only a limited number of misclassified images.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=.80\textwidth]{Images/Test&Result/confusion_matrix.png}
+\caption{Confusion Matrix of the proposed CNN classifier.}
+\label{fig:confusion_matrix}
+\end{figure}
+
+%====================================================
+
+\section{Single-Object Image Classification}
+
+To validate the deployment stage, the trained model was integrated into a REST API hosted on Hugging Face Spaces. The API receives an input image and returns the predicted object category together with its confidence score in JSON format. This experiment verifies that the deployed model performs consistently on unseen real-world images captured outside the training dataset.
+
+The following example demonstrates a successful inference using a can image. The API correctly predicted the object class and returned a high confidence score, confirming the effectiveness of the deployed inference pipeline.
+
+\begin{figure}[!ht]
+\centering
+
+\begin{subfigure}{0.42\textwidth}
+\centering
+\includegraphics[width=.79\linewidth]{Images/Test&Result/test_can.png}
+\caption{Input Image}
+\end{subfigure}
+\hfill
+\begin{subfigure}{0.54\textwidth}
+\centering
+\includegraphics[width=\linewidth]{Images/Test&Result/api_can_response.png}
+\caption{API Response}
+\end{subfigure}
+
+\caption{Single-object image classification using the deployed Hugging Face API.}
+\label{fig:api_can}
+
+\end{figure}
+
+\end{document}

@@ -525,13 +525,13 @@ for the degree of Doctor of Philosophy%
 %%
 %%%%%
 
-\ifcam@firstyr
-% First yr report doesn't need the declaration
-\else
-\chapter*{Acknowledgements}
-\thispagestyle{empty}
-\@acknowledgements{}
-\fi
+% \ifcam@firstyr
+% % First yr report doesn't need the declaration
+% \else
+% \chapter*{Acknowledgements}
+% \thispagestyle{empty}
+% \@acknowledgements{}
+% \fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
@@ -544,6 +544,8 @@ for the degree of Doctor of Philosophy%
 \addtocontents{toc}{\protect\thispagestyle{empty}}
 \pagestyle{empty}
 \tableofcontents{}
+\listoffigures
+\listoftables
 
 \ifcam@glossary%
     \cam@printthesisglossary

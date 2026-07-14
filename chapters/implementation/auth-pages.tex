@@ -182,7 +182,7 @@ const handleSubmit = async (event) => {
       Cookies.set("userDetails", JSON.stringify(user), { secure: true, sameSite: "Strict" });
 
       const destination = user.role === "ADMIN" ? "/admin/users" : "/overview";
-      navigate(destination, { state: { toastMessage: "You logged in successfully🎉." } });
+      navigate(destination, { state: { toastMessage: "You logged in successfully." } });
     } catch (error) {
       console.error("Login error:", error);
       toast.error(apiErrorMessage(error, "Failed to login user"));

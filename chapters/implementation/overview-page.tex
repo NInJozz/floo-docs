@@ -72,7 +72,7 @@ The Overview Page is the main dashboard of the automation platform and the first
     \item While the API call runs, \texttt{isSubmitting} is set to true, disabling both the ``Cancel'' and ``Create Workflow'' buttons and replacing the submit text with a spinning loading wheel to prevent accidental double submissions.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{images/overview-page/create-workflow-form.png}
     \caption{The Create Workflow modal, prompting for the workflow name, description, type, and version.}
@@ -103,7 +103,7 @@ The Overview Page is the main dashboard of the automation platform and the first
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 const data = await ExecutionService.getAnalytics(
   { days: 7 },
   setAuth
@@ -118,7 +118,7 @@ const data = await ExecutionService.getAnalytics(
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 const METRICS_CONFIG = [
   {
     key: "failedExecutions",
@@ -138,7 +138,7 @@ const METRICS_CONFIG = [
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 onClick={() =>
   isClickable && onMetricClick(filterStatus)
 }
@@ -152,7 +152,7 @@ onClick={() =>
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 {!isLoading && analytics && (
   <ExecutionChart analytics={analytics} />
 )}
@@ -250,7 +250,7 @@ onClick={() =>
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 <WorkflowToggle
   isActive={workflow.deployed}
   workflowId={workflow.id}
@@ -268,7 +268,7 @@ onClick={() =>
 
 \begin{center}
 \begin{minipage}{0.6\textwidth}
-\begin{lstlisting}[language=javaScript]
+\begin{lstlisting}
 <JsonPopup
   show={exportModal.show}
   onClose={handleCloseExportModal}
@@ -286,7 +286,7 @@ onClick={() =>
     \item Manages dropdown visibility through the \texttt{isOpen} and \texttt{onToggle} props, registering a document-level click listener while the dropdown is open so clicking outside automatically closes it.
 \end{itemize}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{images/overview-page/json-popup.png}
     \caption{The JSON export popup, showing the workflow structure with download and copy options.}
@@ -317,7 +317,7 @@ onClick={() =>
 
 \subsubsection{CredentialsList Component}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{images/overview-page/credentials-tab.png}
     \caption{The Credentials tab, showing the searchable, filterable credentials table with masked key previews.}
@@ -358,7 +358,7 @@ onClick={() =>
 
 \textbf{Purpose:} Provides a drawer-based interface for creating new credentials and updating existing ones, dynamically generating input fields based on the selected credential type, validating user input, and securely submitting credential information without leaving the dashboard.
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.5\textwidth]{images/overview-page/add-credential.png}
     \caption{The Add Credential drawer}
@@ -437,7 +437,7 @@ onClick={() =>
 
 \subsubsection{Overview Page in Restricted Mode}
 
-\begin{figure}[h!]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{images/overview-page/disabled-overview.png}
     \caption{The Overview Page in restricted mode, showing blurred metrics, a disabled Workflows tab, and the email verification prompt.}

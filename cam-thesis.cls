@@ -294,21 +294,21 @@
 
 % DOCVAR: submissionnotice (The submission notice is shown on the bottom of the
 % title page.)
-\newcommand{\@submissionnotice}{%
-\ifcam@firstyr
-First year report submitted
-\else
-This dissertation is submitted
-\fi
-\ifcam@submissiondate
-    on \@submissiondate{}
-\fi
-\ifcam@firstyr
-in partial fulfilment of the requirements
-\fi
-for the degree of Doctor of Philosophy%
-}
-\newcommand{\submissionnotice}[1]{\renewcommand{\@submissionnotice}{#1}}
+% \newcommand{\@submissionnotice}{%
+% \ifcam@firstyr
+% First year report submitted
+% \else
+% This dissertation is submitted
+% \fi
+% \ifcam@submissiondate
+%     on \@submissiondate{}
+% \fi
+% \ifcam@firstyr
+% in partial fulfilment of the requirements
+% \fi
+% for the degree of Doctor of Philosophy%
+% }
+% \newcommand{\submissionnotice}[1]{\renewcommand{\@submissionnotice}{#1}}
 
 % DOCVAR: collegeshield (The name of the file that contains the image of the
 % college's shield. If `collegeshield' is provided, it will be included in the
@@ -493,19 +493,19 @@ for the degree of Doctor of Philosophy%
 \else
 {\ifcam@firstyr
 % First yr report doesn't need the declaration
-\else
-\chapter*{Declaration}
-\thispagestyle{empty}
-This dissertation is the result of my own work and includes nothing which is the outcome
-of work done in collaboration except as declared in the Preface and specified in the text.
-It is not substantially the same as any that I have submitted, or am concurrently
-submitting, for a degree or diploma or other qualification at the University of Cambridge
-or any other University or similar institution except as declared in the Preface and
-specified in the text. I further state that no substantial part of my dissertation has
-already been submitted, or is being concurrently submitted, for any such degree, diploma
-or other qualification at the University of Cambridge or any other University or similar
-institution except as declared in the Preface and specified in the text.
-This dissertation does not exceed the prescribed limit of 60\,000 words.
+% \else
+% \chapter*{Declaration}
+% \thispagestyle{empty}
+% This dissertation is the result of my own work and includes nothing which is the outcome
+% of work done in collaboration except as declared in the Preface and specified in the text.
+% It is not substantially the same as any that I have submitted, or am concurrently
+% submitting, for a degree or diploma or other qualification at the University of Cambridge
+% or any other University or similar institution except as declared in the Preface and
+% specified in the text. I further state that no substantial part of my dissertation has
+% already been submitted, or is being concurrently submitted, for any such degree, diploma
+% or other qualification at the University of Cambridge or any other University or similar
+% institution except as declared in the Preface and specified in the text.
+% This dissertation does not exceed the prescribed limit of 60\,000 words.
 
 % Leaving some space for the signature:
 \vspace{15mm}
@@ -525,13 +525,13 @@ This dissertation does not exceed the prescribed limit of 60\,000 words.
 %%
 %%%%%
 
-\ifcam@firstyr
-% First yr report doesn't need the declaration
-\else
-\chapter*{Acknowledgements}
-\thispagestyle{empty}
-\@acknowledgements{}
-\fi
+% \ifcam@firstyr
+% % First yr report doesn't need the declaration
+% \else
+% \chapter*{Acknowledgements}
+% \thispagestyle{empty}
+% \@acknowledgements{}
+% \fi
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
@@ -544,6 +544,8 @@ This dissertation does not exceed the prescribed limit of 60\,000 words.
 \addtocontents{toc}{\protect\thispagestyle{empty}}
 \pagestyle{empty}
 \tableofcontents{}
+\listoffigures
+\listoftables
 
 \ifcam@glossary%
     \cam@printthesisglossary

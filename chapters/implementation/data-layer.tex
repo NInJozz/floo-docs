@@ -1,0 +1,32 @@
+\section{Data Layer Implementation (Prisma ORM)}
+
+While the data dictionary outlines the complete physical structure of the database, the actual implementation is managed via the Prisma ORM. Rather than writing raw SQL, the platform defines models declaratively. This approach allows the database engine to enforce relational integrity while automatically generating TypeScript types for the backend, ensuring end-to-end safety.
+
+Rather than listing the entire schema, the following snippet demonstrates how the system implements complex requirements—such as native JSON storage for the workflow graphs, aggressive cascading deletions for data hygiene, and composite unique constraints to prevent duplicate credential injections:
+
+\begin{lstlisting}[caption={Prisma implementation highlighting JSON types, relations, and composite constraints}]
+model Project {
+  id           String   @id @default(uuid())
+  name         String
+  type         String
+  workflow     Json?    // Natively handles complex React Flow graphs
+  userId       String
+
+  // Relations with aggressive cascading for account deletion
+  executions   Execution[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserCredentialValue {
+  id        String   @id @default(uuid())
+  setId     String
+  paramId   String
+  value     String
+
+  userCredentialSet       UserCredentialSet       @relation(fields: [setId], references: [id], onDelete: Cascade)
+  credentialParameterType CredentialParameterType @relation(fields: [paramId], references: [id], onDelete: Cascade)
+
+  // Composite Unique Constraint guarantees one value per parameter
+  @@unique([setId, paramId])
+}
+\end{lstlisting}

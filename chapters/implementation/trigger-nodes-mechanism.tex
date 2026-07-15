@@ -1,6 +1,6 @@
-\subsection{Trigger Nodes Mechanism}
+\section{Trigger Nodes Mechanism}
 
-\subsubsection{Overview}
+\subsection{Overview}
 In a workflow automation platform, every workflow must have an entry point — something that decides when execution begins. This role is fulfilled by trigger nodes. A trigger node is a specialized node that listens for a specific event or condition and, when that condition is met, fires the rest of the workflow graph for execution.
 Unlike regular action nodes that simply process inputs and pass outputs downstream, trigger nodes are always-on components that run persistently as long as a workflow is deployed. Each trigger type reacts to a different source of events. The platform supports the following trigger types:
 \begin{itemize}
@@ -12,7 +12,7 @@ Unlike regular action nodes that simply process inputs and pass outputs downstre
 
 The trigger mechanism is built around three key concerns: starting triggers when a workflow is deployed, reliably passing execution down the workflow graph when a trigger fires, and cleanly stopping all triggers when a workflow is stopped or the server shuts down.
 
-\subsubsection{Core Abstractions}
+\subsection{Core Abstractions}
 \textbf{The EventSource Interface}
 All trigger types implement the \texttt{EventSource} interface, which defines a minimal two-method contract:
 \begin{lstlisting}

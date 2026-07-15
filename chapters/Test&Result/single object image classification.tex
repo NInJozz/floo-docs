@@ -1,47 +1,46 @@
-\documentclass[a4paper,12pt]{report}
 
 %====================================================
 % Packages
 %====================================================
-\usepackage[utf8]{inputenc}
-\usepackage[a4paper,margin=2.5cm]{geometry}
-\usepackage{graphicx}
-\usepackage{float}
-\usepackage{booktabs}
-\usepackage{hyperref}
-\usepackage{xcolor}
-\usepackage{titlesec}
-\usepackage{caption}
-\usepackage{subcaption}
-\usepackage{amsmath}
+% \usepackage[utf8]{inputenc}
+% \usepackage[a4paper,margin=2.5cm]{geometry}
+% \usepackage{graphicx}
+% \usepackage{float}
+% \usepackage{booktabs}
+% \usepackage{hyperref}
+% \usepackage{xcolor}
+% \usepackage{titlesec}
+% \usepackage{caption}
+% \usepackage{subcaption}
+% \usepackage{amsmath}
 
-%====================================================
-% Caption Style
-%====================================================
-\captionsetup{justification=centering}
-\captionsetup[subfigure]{justification=centering}
+% %====================================================
+% % Caption Style
+% %====================================================
+% \captionsetup{justification=centering}
+% \captionsetup[subfigure]{justification=centering}
 
-%====================================================
-% Chapter Style
-%====================================================
-\titleformat{\chapter}[display]
-{\normalfont\Huge\bfseries}
-{}{0pt}{\Huge}
+% %====================================================
+% % Chapter Style
+% %====================================================
+% \titleformat{\chapter}[display]
+% {\normalfont\Huge\bfseries}
+% {}{0pt}{\Huge}
 
-\titlespacing*{\chapter}{0pt}{-55pt}{8pt}
+% \titlespacing*{\chapter}{0pt}{-55pt}{8pt}
 
-%====================================================
-% Reduce white spaces
-%====================================================
-\setlength{\floatsep}{5pt}
-\setlength{\textfloatsep}{8pt}
-\setlength{\intextsep}{8pt}
-\setlength{\abovecaptionskip}{3pt}
-\setlength{\belowcaptionskip}{0pt}
+% %====================================================
+% % Reduce white spaces
+% %====================================================
+% \setlength{\floatsep}{5pt}
+% \setlength{\textfloatsep}{8pt}
+% \setlength{\intextsep}{8pt}
+% \setlength{\abovecaptionskip}{3pt}
+% \setlength{\belowcaptionskip}{0pt}
 
-\begin{document}
+% \begin{document}
 
-\chapter*{single object image classification}
+\section*{single object image classification}
 \addcontentsline{toc}{chapter}{Testing and Results}
 \label{chap:testing-results}
 
@@ -58,13 +57,13 @@ The CNN model was trained for 100 epochs using categorical cross-entropy loss. F
 
 \begin{subfigure}{0.47\textwidth}
 \centering
-\includegraphics[width=\linewidth]{Images/Test_Result/model_accuracy.png}
+\includegraphics[width=\linewidth]{images/Test_Result/model_accuracy.png}
 \caption{Training and Validation Accuracy}
 \end{subfigure}
 \hfill
 \begin{subfigure}{0.47\textwidth}
 \centering
-\includegraphics[width=\linewidth]{Images/Test_Result/model_loss.png}
+\includegraphics[width=\linewidth]{images/Test_Result/model_loss.png}
 \caption{Training and Validation Loss}
 \end{subfigure}
 
@@ -80,7 +79,7 @@ The confusion matrix provides a detailed evaluation of the classification perfor
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=.80\textwidth]{Images/Test_Result/confusion_matrix.png}
+\includegraphics[width=.80\textwidth]{images/Test_Result/confusion_matrix.png}
 \caption{Confusion Matrix of the proposed CNN classifier.}
 \label{fig:confusion_matrix}
 \end{figure}
@@ -98,13 +97,13 @@ The following example demonstrates a successful inference using a can image. The
 
 \begin{subfigure}{0.42\textwidth}
 \centering
-\includegraphics[width=.79\linewidth]{Images/Test_Result/test_can.png}
+\includegraphics[width=.79\linewidth]{images/Test_Result/test_can.png}
 \caption{Input Image}
 \end{subfigure}
 \hfill
 \begin{subfigure}{0.54\textwidth}
 \centering
-\includegraphics[width=\linewidth]{Images/Test_Result/api_can_response.png}
+\includegraphics[width=\linewidth]{images/Test_Result/api_can_response.png}
 \caption{API Response}
 \end{subfigure}
 
@@ -113,4 +112,4 @@ The following example demonstrates a successful inference using a can image. The
 
 \end{figure}
 
-\end{document}
+% \end{document}

@@ -1,43 +1,42 @@
-\documentclass[a4paper,12pt]{report}
 
 %====================================================
 % Packages
 %====================================================
-\usepackage[utf8]{inputenc}
-\usepackage[a4paper,margin=2.5cm]{geometry}
-\usepackage{graphicx}
-\usepackage{float}
-\usepackage{booktabs}
-\usepackage{hyperref}
-\usepackage{xcolor}
-\usepackage{titlesec}
-\usepackage{caption}
-\usepackage{subcaption} % حزمة أساسية لدمج الصور الفرعية بجانب بعضها
-\usepackage{amsmath}
+% \usepackage[utf8]{inputenc}
+% \usepackage[a4paper,margin=2.5cm]{geometry}
+% \usepackage{graphicx}
+% \usepackage{float}
+% \usepackage{booktabs}
+% \usepackage{hyperref}
+% \usepackage{xcolor}
+% \usepackage{titlesec}
+% \usepackage{caption}
+% \usepackage{subcaption} % حزمة أساسية لدمج الصور الفرعية بجانب بعضها
+% \usepackage{amsmath}
+
+% %====================================================
+% % Chapter Style
+% %====================================================
+% \titleformat{\chapter}[display]
+% {\normalfont\Huge\bfseries}
+% {}{0pt}{\Huge}
+
+% \titlespacing*{\chapter}{0pt}{-40pt}{20pt}
+
+% %====================================================
+% % تقليل المسافات الافتراضية حول الجداول والصور لمنع الفراغات البيضاء
+% %====================================================
+% \setlength{\floatsep}{6pt plus 2pt minus 2pt}       % المسافة بين صورتين عائمتين
+% \setlength{\textfloatsep}{10pt plus 2pt minus 4pt}  % المسافة بين الصورة والنص (أعلى/أسفل الصفحة)
+% \setlength{\intextsep}{10pt plus 2pt minus 2pt}     % المسافة حول الصورة المدمجة وسط النص
+% \setcounter{totalnumber}{4}                         % السماح بوجود حتى 4 صور في الصفحة الواحدة
+
+% %====================================================
+
+% \begin{document}
 
 %====================================================
-% Chapter Style
-%====================================================
-\titleformat{\chapter}[display]
-{\normalfont\Huge\bfseries}
-{}{0pt}{\Huge}
-
-\titlespacing*{\chapter}{0pt}{-40pt}{20pt}
-
-%====================================================
-% تقليل المسافات الافتراضية حول الجداول والصور لمنع الفراغات البيضاء
-%====================================================
-\setlength{\floatsep}{6pt plus 2pt minus 2pt}       % المسافة بين صورتين عائمتين
-\setlength{\textfloatsep}{10pt plus 2pt minus 4pt}  % المسافة بين الصورة والنص (أعلى/أسفل الصفحة)
-\setlength{\intextsep}{10pt plus 2pt minus 2pt}     % المسافة حول الصورة المدمجة وسط النص
-\setcounter{totalnumber}{4}                         % السماح بوجود حتى 4 صور في الصفحة الواحدة
-
-%====================================================
-
-\begin{document}
-
-%====================================================
-\chapter*{Text Guided Object detection}
+\section*{Text Guided Object detection}
 \addcontentsline{toc}{chapter}{Testing and Results}
 \label{chap:testing-results}
 
@@ -147,11 +146,11 @@ Figure~\ref{fig:detection} demonstrates an example where the model successfully 
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{Images/example_detection.png}
+\includegraphics[width=0.85\textwidth]{images/Test_Result/example_detection.png}
 \caption{Example of text-guided object detection.}
 \label{fig:detection}
 \end{figure}
 
 %====================================================
 
-\end{document}
+% \end{document}

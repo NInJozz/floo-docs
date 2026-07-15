@@ -138,7 +138,7 @@ The Conceptual Entity Relationship Diagram (CERD) outlines the high-level busine
 \begin{landscape}
     \begin{figure}[htbp]
         \centering
-        \includegraphics[width=\linewidth]{images/erd/conceptual-erd.png}
+        \includegraphics[width=0.9\paperheight,height=0.9\paperwidth,keepaspectratio]{images/erd/conceptual-erd.png}
         \caption{Conceptual Entity Relationship Diagram (CERD) for the FLOO platform}
         \label{fig:cerd}
     \end{figure}
@@ -167,12 +167,12 @@ The logical design translates the conceptual entities into concrete database tab
 
 
 \begin{landscape}
-    \begin{figure}[H]
-        \centering
-        \includegraphics[width=\linewidth]{images/erd/physical-erd.png}
-        \caption{Physical Entity Relationship Diagram (CERD) for the FLOO platform}
-        \label{fig:perd}
-    \end{figure}
+  \begin{figure}[H]
+      \centering
+      \includegraphics[width=0.9\paperheight,height=0.9\paperwidth,keepaspectratio]{images/erd/physical-erd.png}
+      \caption{Physical Entity Relationship Diagram (CERD) for the FLOO platform}
+      \label{fig:perd}
+  \end{figure}
 \end{landscape}
 
 \subsubsection{Primary and Foreign Key Strategy}
@@ -4422,4 +4422,271 @@ The frontend of the application is a single-page application (SPA) built utilizi
 \begin{itemize}
     \item \textbf{\texttt{config/apiUrls}:} Supplies the absolute endpoint addresses to the service layer.
     \item \textbf{\texttt{utils/apiError}:} Intercepts failed HTTP responses and translates them into human-readable error messages for the UI hooks to display.
+\end{itemize}
+
+
+
+\section{AI Workflow Generation Pipeline}
+\includegraphics[width=0.85\textwidth]{images/backend/agent.png}
+
+To improve the reliability of AI-generated workflows and reduce the possibility of hallucinated nodes, invalid connections, or incomplete configurations, the workflow generation process is implemented as a multi-agent pipeline. Instead of relying on a single Large Language Model (LLM) to directly generate a workflow, the task is decomposed into several specialized subagents, each responsible for a specific stage of the generation process.
+
+Each subagent is implemented as an independent LLM context with a dedicated system prompt, a defined objective, and a restricted set of available tools. This separation limits the scope of each agent's reasoning process and allows each stage to produce a structured output that can be validated before being passed to the next stage.
+
+The overall pipeline consists of five main stages:
+
+\begin{enumerate}
+    \item Intent classification
+    \item Workflow planning
+    \item Node discovery
+    \item Workflow construction
+    \item Workflow validation
+\end{enumerate}
+
+Each stage progressively transforms the user's natural language request into a valid executable workflow.
+
+\subsection{Intent Classifier}
+
+The Intent Classifier is the entry point of the AI workflow generation pipeline. Its responsibility is to determine the user's objective and select the appropriate processing path.
+
+The classifier analyzes the user prompt and categorizes it into one of three supported intents:
+
+\begin{itemize}
+    \item \textbf{Inquiry}: The user requests information about the current workflow, available nodes, or system capabilities. The agent responds by providing the required information without modifying the workflow.
+    
+    \item \textbf{Build}: The user requests the creation of a new workflow. The request is forwarded to the planning stage to generate a workflow specification.
+    
+    \item \textbf{Edit}: The user requests modifications to an existing workflow. The existing workflow context is provided to later stages so that the required changes can be applied.
+\end{itemize}
+
+The classifier is intentionally isolated from workflow generation tools since its role is only understanding the user's intention. If the intent cannot be determined with sufficient confidence, the agent requests additional clarification rather than making assumptions.
+
+\subsection{Planner}
+
+The Planner converts the high-level user request into a structured sequence of implementation goals. Since user descriptions are usually expressed in terms of desired outcomes rather than specific workflow components, the planner acts as an intermediate reasoning layer between user intent and workflow implementation.
+
+Each generated goal describes a single logical operation required to achieve the final objective. A goal contains:
+
+\begin{itemize}
+    \item A description of the required operation.
+    \item Search keywords describing the expected functionality.
+    \item The expected input and output behavior when applicable.
+\end{itemize}
+
+For example, a request such as "resize uploaded images and notify me when finished" can be decomposed into multiple goals including image processing, file handling, and notification delivery.
+
+This decomposition enables the following stages to operate on smaller, well-defined tasks instead of attempting to solve the entire workflow generation problem at once.
+
+\subsection{Node Discoverer}
+
+The Node Discoverer is responsible for mapping planning goals into available workflow nodes from the node registry.
+
+Since the LLM does not directly know the complete list of available nodes, the discoverer interacts with the node registry through search tools. It performs semantic discovery using fuzzy matching techniques over node names and descriptions.
+
+The discovery process follows an iterative approach:
+
+\begin{enumerate}
+    \item Extract search terms from the planning goal.
+    \item Query the node registry using fuzzy search.
+    \item Evaluate the returned candidate nodes.
+    \item Refine the search terms if no suitable node is found.
+    \item Repeat until a suitable node is selected or the retry limit is reached.
+\end{enumerate}
+
+The output of this stage is a collection of selected nodes that can be used to implement each planning goal.
+
+Restricting node selection to the registry prevents the model from generating nonexistent components and ensures that all produced workflows are compatible with the execution engine.
+
+\subsection{Workflow Construction}
+
+After identifying the required nodes, the Workflow Construction stage is responsible for assembling the final workflow graph.
+
+During this stage, the LLM is provided with a controlled set of workflow manipulation tools. These tools allow the agent to perform operations such as:
+
+\begin{itemize}
+    \item Adding nodes to the workflow graph.
+    \item Removing unnecessary nodes.
+    \item Creating connections between node inputs and outputs.
+    \item Updating node parameters and configurations.
+    \item Inspecting the current workflow state.
+\end{itemize}
+
+The construction process follows a tool-based iterative loop. Instead of generating the complete workflow structure in a single response, the agent repeatedly analyzes the current graph state and invokes the required tools until the workflow satisfies the planned objectives.
+
+This approach provides several advantages:
+
+\begin{itemize}
+    \item Prevents invalid graph structures caused by single-pass generation.
+    \item Allows the model to react to tool results.
+    \item Enables incremental correction during construction.
+    \item Keeps workflow modifications explicit and traceable.
+\end{itemize}
+
+The final output of this stage is a complete workflow graph containing nodes, connections, and configured parameters.
+
+\subsection{Validator}
+
+The Validator is the final stage of the pipeline and is responsible for ensuring that the generated workflow is executable and consistent.
+
+The validator performs multiple checks, including:
+
+\begin{itemize}
+    \item Verifying that all referenced nodes exist in the node registry.
+    \item Checking that required parameters are provided.
+    \item Ensuring that node connections are compatible.
+    \item Detecting disconnected or unreachable nodes.
+    \item Validating the overall workflow structure.
+\end{itemize}
+
+If the validator identifies problems that can be automatically corrected, it applies the necessary fixes. For example, missing default parameters or incorrect connections may be repaired automatically.
+
+For issues requiring additional information from the user, such as missing credentials or ambiguous configuration values, the validator reports the problem and requests clarification before the workflow is stored.
+
+\subsection{Agent Tool Isolation}
+
+A key design principle of the pipeline is restricting each subagent to only the tools required for its responsibility. This prevents unintended modifications and reduces the possibility of invalid reasoning.
+
+For example:
+
+\begin{itemize}
+    \item The Intent Classifier has no workflow modification tools.
+    \item The Planner only produces workflow specifications.
+    \item The Node Discoverer only accesses node search capabilities.
+    \item The Construction Agent receives workflow editing tools.
+    \item The Validator receives workflow inspection and repair tools.
+\end{itemize}
+
+This modular architecture improves reliability, simplifies debugging, and allows individual stages to be independently improved without affecting the rest of the system.
+
+\section*{AI Integration}
+
+\section{Overview}
+
+To extend the workflow engine with intelligent image-processing capabilities, an AI integration layer was introduced. The AI team developed multiple computer vision models in Python, including image processing and analysis tasks such as edge detection, optical character recognition (OCR), image classification, and image cropping.
+
+Since the workflow engine is implemented in Node.js while the AI models are implemented in Python, a communication mechanism was required to allow both systems to work together without introducing tight coupling.
+
+To achieve this, the AI models were exposed as RESTful services using \textbf{FastAPI}, allowing the workflow engine to invoke AI functionality through standard HTTP requests.
+
+
+\section{Architecture}
+
+The integration follows a service-oriented architecture where the workflow engine communicates with an independent AI service.
+
+The backend is responsible for workflow orchestration, while the FastAPI service is responsible for executing AI models and managing generated outputs.
+
+This separation allows both systems to evolve independently while maintaining a clean interface between them.
+
+
+\section{AI Nodes}
+
+Each AI capability is represented as a workflow node.
+
+Instead of embedding image-processing algorithms directly inside the backend, every AI node acts as an adapter between the workflow engine and the corresponding AI model.
+
+Examples of implemented AI nodes include:
+
+\begin{itemize}
+    \item Edge Detection
+    \item OCR
+    \item Image Classification
+    \item Image Cropping
+\end{itemize}
+
+All AI nodes inherit from the common \texttt{Node} base class and therefore integrate seamlessly with the execution engine.
+
+During execution, the node performs the following steps:
+
+\begin{enumerate}
+    \item Retrieves execution context and node parameters.
+    \item Reads the required execution metadata.
+    \item Sends an HTTP request to the FastAPI service.
+    \item Waits for the processing result.
+    \item Stores the returned output information.
+    \item Passes the output to downstream workflow nodes.
+\end{enumerate}
+
+This design enables AI operations to behave exactly like any other workflow node while hiding the implementation details of the underlying models.
+
+
+\section{Metadata-Based Communication}
+
+Rather than sending only the image to the AI service, the backend also sends execution metadata, including:
+
+\begin{itemize}
+    \item User ID
+    \item Project ID
+    \item Execution ID
+    \item Node ID
+\end{itemize}
+
+This metadata enables the AI service to correctly associate generated outputs with the corresponding workflow execution.
+
+It also allows generated files to be organized automatically according to the workflow structure without requiring additional backend processing.
+
+
+\section{Optimized Output Handling}
+
+One of the architectural decisions made during the AI integration was to avoid transferring processed images back to the backend.
+
+Instead of following the traditional workflow:
+
+\begin{verbatim}
+Python Model
+      |
+      v
+Node.js Backend
+      |
+      v
+Cloud Storage
+\end{verbatim}
+
+the implemented architecture performs the upload directly from the FastAPI service:
+
+\begin{verbatim}
+Python Model
+      |
+      v
+FastAPI Service
+      |
+      v
+Upload Result
+      |
+      v
+Cloud Storage
+      |
+      v
+Return Output URL
+      |
+      v
+Node.js Backend
+\end{verbatim}
+
+Only the generated image URL is returned to the backend.
+
+This approach provides several advantages:
+
+\begin{itemize}
+    \item Reduced network traffic
+    \item Lower memory consumption
+    \item Faster workflow execution
+    \item Elimination of redundant file transfers
+    \item Clear separation of responsibilities
+\end{itemize}
+
+
+\section{Design Benefits}
+
+The adopted architecture provides several software engineering advantages:
+
+\begin{itemize}
+    \item \textbf{Loose Coupling:} The backend is independent of the internal implementation of AI models.
+    
+    \item \textbf{Modularity:} AI models can be updated or replaced without modifying the workflow engine.
+    
+    \item \textbf{Scalability:} Additional AI services can be integrated by exposing new REST endpoints.
+    
+    \item \textbf{Reusability:} Every AI capability is encapsulated as a reusable workflow node.
+    
+    \item \textbf{Maintainability:} The AI service and workflow engine can be developed and deployed independently.
 \end{itemize}

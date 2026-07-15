@@ -1,1 +1,143 @@
 \chapter{Requirements Analysis}
+
+\section{Introduction}
+
+This chapter presents the requirements analysis of the proposed system. The goal of this analysis is to identify the main functional and non-functional requirements needed to develop an automation platform that allows users to create, manage, and execute workflows through a visual interface. The system provides integration with external services through APIs and supports automated execution of different tasks using predefined nodes.
+
+\section{System Overview}
+
+The system is an automation platform that enables users to build workflows by connecting different nodes together. Each node represents a specific operation, such as processing data, communicating with external APIs, or performing a computational task. The created workflows are stored and executed by the backend execution engine.
+
+The platform also provides AI-assisted workflow generation, allowing users to describe their desired automation process using natural language. The system analyzes the request and generates a suitable workflow structure using specialized AI components.
+
+\section{Functional Requirements}
+
+Functional requirements describe the main features and operations provided by the system.
+
+\subsection{User Interface}
+
+The system shall provide a graphical interface that allows users to:
+
+\begin{itemize}
+    \item Create and edit workflows using a visual node-based editor.
+    \item Add, remove, and connect workflow nodes.
+    \item Configure node parameters.
+    \item Save and load existing workflows.
+\end{itemize}
+
+\subsection{Workflow Management}
+
+The system shall support workflow management operations, including:
+
+\begin{itemize}
+    \item Creating new workflows.
+    \item Storing workflow definitions.
+    \item Retrieving previously created workflows.
+    \item Updating workflow configurations.
+    \item Executing selected workflows.
+\end{itemize}
+
+\subsection{Node Management}
+
+The system shall provide a collection of predefined nodes that represent different operations.
+
+Each node shall contain:
+
+\begin{itemize}
+    \item A unique identifier.
+    \item A description of its functionality.
+    \item Required input parameters.
+    \item Execution logic.
+    \item Defined input and output formats.
+\end{itemize}
+
+The system shall allow the execution engine to discover and execute nodes dynamically through a node registry.
+
+\subsection{API Integration}
+
+The system shall support communication with external services through APIs.
+
+The API layer shall provide:
+
+\begin{itemize}
+    \item Endpoints for workflow creation and management.
+    \item Endpoints for workflow execution.
+    \item Communication between the frontend application and backend services.
+    \item Integration with external services used by workflow nodes.
+\end{itemize}
+
+\subsection{Workflow Execution}
+
+The system shall provide an execution engine responsible for running workflows.
+
+The execution engine shall:
+
+\begin{itemize}
+    \item Receive workflow execution requests.
+    \item Process workflow nodes in the correct order.
+    \item Manage execution tasks asynchronously.
+    \item Handle communication between connected nodes.
+    \item Report execution results and errors.
+\end{itemize}
+
+\subsection{AI-Assisted Workflow Generation}
+
+The system shall provide an AI assistant that helps users generate workflows from natural language descriptions.
+
+The AI workflow generation module shall:
+
+\begin{itemize}
+    \item Analyze user requests.
+    \item Identify required workflow operations.
+    \item Search available nodes.
+    \item Construct a workflow representation.
+    \item Validate the generated workflow before execution.
+\end{itemize}
+
+\section{Non-Functional Requirements}
+
+Non-functional requirements describe the quality attributes of the system.
+
+\subsection{Performance}
+
+The system should:
+
+\begin{itemize}
+    \item Execute workflows efficiently.
+    \item Handle multiple workflow execution requests.
+    \item Minimize delays between workflow steps.
+\end{itemize}
+
+\subsection{Scalability}
+
+The system should be designed to support:
+
+\begin{itemize}
+    \item Adding new node types without modifying existing components.
+    \item Increasing the number of available workflows and users.
+    \item Extending integrations with additional external APIs.
+\end{itemize}
+
+\subsection{Reliability}
+
+The system should:
+
+\begin{itemize}
+    \item Handle execution failures gracefully.
+    \item Provide meaningful error messages.
+    \item Maintain consistent workflow data.
+\end{itemize}
+
+\subsection{Maintainability}
+
+The system should have a modular architecture that allows:
+
+\begin{itemize}
+    \item Independent development of system components.
+    \item Easy addition of new features.
+    \item Clear separation between workflow management, execution, and AI components.
+\end{itemize}
+
+\section{Summary}
+
+This chapter identified the main requirements of the proposed automation platform. The system focuses on providing workflow creation, API-based communication, dynamic node execution, and AI-assisted workflow generation while maintaining a modular and extensible architecture.

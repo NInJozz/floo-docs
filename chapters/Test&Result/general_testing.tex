@@ -1,0 +1,136 @@
+
+\section{Overview}
+
+Testing was performed throughout the development process to ensure the correctness, reliability, and stability of the workflow engine. Multiple testing levels were applied, ranging from unit testing of individual components to end-to-end validation of complete workflow executions.
+
+The testing process focused on verifying both the correctness of isolated modules and the interactions between different backend services.
+
+The testing strategy included:
+
+\begin{itemize}
+    \item Unit Testing
+    \item API Testing
+    \item Integration Testing
+    \item End-to-End Workflow Testing
+\end{itemize}
+
+
+\section{Unit Testing}
+
+Unit testing was performed using \textbf{Jest} to validate the behavior of individual backend components independently from the rest of the system.
+
+The objective was to verify that each module performs its intended functionality while handling both valid and invalid scenarios correctly.
+
+Examples of tested components include:
+
+\begin{itemize}
+    \item Node Registry
+    \item Node Loader
+    \item Event Source implementations
+    \item Workflow utility functions
+    \item Credential utilities
+    \item Validation logic
+\end{itemize}
+
+Each unit test verifies:
+
+\begin{itemize}
+    \item Expected outputs
+    \item Error handling
+    \item Edge cases
+    \item Invalid inputs
+    \item Exception throwing
+\end{itemize}
+
+Automated unit testing allowed rapid detection of regressions whenever new functionality was added.
+
+
+\section{API Testing}
+
+Backend REST APIs were validated using \textbf{Postman}.
+
+Each endpoint was tested under both normal and exceptional conditions to verify:
+
+\begin{itemize}
+    \item Request validation
+    \item Required parameters
+    \item Authentication and authorization
+    \item HTTP status codes
+    \item Error responses
+    \item Returned payloads
+\end{itemize}
+
+API testing ensured that backend services communicate correctly with frontend components and external systems.
+
+
+\section{Integration Testing}
+
+Integration testing verified the interaction between multiple backend modules and external services.
+
+Unlike unit testing, integration tests focused on ensuring that independent components work together correctly.
+
+The following integrations were validated:
+
+\begin{itemize}
+    \item Backend $\leftrightarrow$ Database (Prisma)
+    \item Backend $\leftrightarrow$ Redis
+    \item Backend $\leftrightarrow$ BullMQ
+    \item Backend $\leftrightarrow$ AI FastAPI Service
+    \item Backend $\leftrightarrow$ SMTP Service
+\end{itemize}
+
+These tests confirmed that data flows correctly across different services and that each subsystem communicates using the expected interfaces.
+
+
+\section{End-to-End Workflow Testing}
+
+Complete workflows were executed to validate the behavior of the system under realistic operating conditions.
+
+A workflow execution was verified from the initial trigger until the final node execution.
+
+Typical execution scenarios included:
+
+\begin{itemize}
+    \item Trigger activation
+    \item Workflow scheduling
+    \item Node execution sequence
+    \item AI image processing
+    \item Email delivery
+    \item Output persistence
+\end{itemize}
+
+End-to-end testing ensured that the execution engine correctly orchestrates node execution while preserving data flow between workflow nodes.
+
+
+\section{Error Handling Validation}
+
+Error scenarios were intentionally tested to verify the robustness of the workflow engine.
+
+Examples include:
+
+\begin{itemize}
+    \item Missing node parameters
+    \item Invalid credentials
+    \item Network failures
+    \item AI service unavailability
+    \item Invalid workflow configurations
+    \item Missing workflow nodes
+\end{itemize}
+
+The backend was verified to return meaningful error messages while preventing unexpected system failures.
+
+
+\section{Performance Validation}
+
+Basic performance validation was performed on the workflow execution process.
+
+Special attention was given to:
+
+\begin{itemize}
+    \item Concurrent workflow execution through BullMQ
+    \item Redis-based state management
+    \item AI service communication
+    \item Image processing workflows
+\end{itemize}
+
+For AI nodes, processed images were uploaded directly by the FastAPI service instead of being transferred back to the backend before uploading. This design significantly reduced network traffic, minimized memory consumption, and improved overall workflow performance.

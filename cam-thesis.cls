@@ -367,63 +367,67 @@
 
 
 \begin{center}
-\begin{minipage}{0.45\textwidth}
-    \centering
-    \includegraphics[width=0.6\textwidth]{CollegeShields/ZagazigUniversity.png}
-\end{minipage}
-\hfill
-\begin{minipage}{0.45\textwidth}
-    \centering
-    \includegraphics[width=0.6\textwidth]{CollegeShields/FacultyOfEngineering.png}
-\end{minipage}
-\end{center}
-
-
-%% THESIS TITLE box
-\newsavebox{\cam@title}
-\begin{lrbox}{\cam@title}
-    \begin{minipage}[c][\height][c]{.98\textwidth}
-        \begin{center}
-			\Huge%
-				\ifcam@times\else%
-				\bfseries%
-				\fi%
-			{\@title{}}%
-			\ifcam@firstyr\\%
-				{\vspace{5mm}\emph{\LARGE PhD Proposal}}%
-			\fi%
-		\end{center}
+    \begin{minipage}{0.35\textwidth}
+        \centering
+        \includegraphics[width=0.6\textwidth]{CollegeShields/ZagazigUniversity.png}
     \end{minipage}
-\end{lrbox}
-
-%% COLLEGESHIELD box (optional):
-\ifcam@collegeshield%
-    \newsavebox{\cam@collegeshieldbox}
-    \begin{lrbox}{\cam@collegeshieldbox}
-    \includegraphics[height=20mm]{\@collegeshield}
-    \end{lrbox}
-\fi
-
-%% AUTHOR&COLLEGE box
-\newsavebox{\cam@authorcollege}
-\begin{lrbox}{\cam@authorcollege}
-    \begin{minipage}[c][\height][c]{.98\textwidth}
-        \begin{center}
-        {\large \@author{}~\\[1ex]}
+    \hfill
+    \begin{minipage}{0.35\textwidth}
+        \centering
+        \includegraphics[width=0.6\textwidth]{CollegeShields/FacultyOfEngineering.png}
+    \end{minipage}
+    \end{center}
+    
+    %% LOGO:
+    \ifcam@collegeshield%
+        \newsavebox{\cam@collegeshieldbox}
+        \begin{lrbox}{\cam@collegeshieldbox}
+            \includegraphics[height=35mm]{\@collegeshield}
+        \end{lrbox}
+    \fi
+    
+    \begin{center}
         \ifcam@collegeshield%
-            \vspace{2mm}{\usebox{\cam@collegeshieldbox}}\\
+            \vspace{2mm}
+            \usebox{\cam@collegeshieldbox}
+            \vspace{1mm}
         \fi
-        \@college{}
-        \end{center}
-    \end{minipage}
-\end{lrbox}
+    \end{center}
+    
+    %% THESIS TITLE box
+    \newsavebox{\cam@title}
+    \begin{lrbox}{\cam@title}
+        \begin{minipage}[c][\height][c]{.98\textwidth}
+            \begin{center}
+                \Huge%
+                    \ifcam@times\else%
+                    \bfseries%
+                    \fi%
+                {\@title{}}%
+                \ifcam@firstyr\\%
+                    {\vspace{5mm}\emph{\LARGE PhD Proposal}}%
+                \fi%
+            \end{center}
+        \end{minipage}
+    \end{lrbox}
+    
+    %% AUTHOR&COLLEGE box
+    \newsavebox{\cam@authorcollege}
+    \begin{lrbox}{\cam@authorcollege}
+        \begin{minipage}[c][\height][c]{.98\textwidth}
+            \begin{center}
+            {\large \@author{}~\\[1ex]}
+            \@college{}
+            \end{center}
+        \end{minipage}
+    \end{lrbox}
 
 %% SUBMISSION NOTICE box
 \newsavebox{\cam@submitnotice}
 \begin{lrbox}{\cam@submitnotice}
     \begin{minipage}[c][\height][c]{.98\textwidth}
         \begin{center}
-            \@submissionnotice{}
+            %\@submissionnotice{}
         \end{center}
     \end{minipage}
 \end{lrbox}
@@ -445,14 +449,23 @@
 %%%%%
 \begin{center}
 
-\vspace*{2cm}
+\vspace*{1.5cm}
 
 {\usebox{\cam@title}}
 
-\vspace{2cm}
+\vspace{0.5cm}
 
 {\usebox{\cam@authorcollege}}
+\vfill
 
+\vspace{0.5cm}
+{\Large\bfseries Under the Supervision of\par}
+
+{\LARGE\bfseries Dr. Howida Abdelatif\par}
+\vspace{0.5cm}
+{\LARGE\bfseries 2025 - 2026\par}
+
+\vspace{1cm}
 \vfill
 
 {\usebox{\cam@submitnotice}}
@@ -525,13 +538,30 @@
 %%
 %%%%%
 
-% \ifcam@firstyr
-% % First yr report doesn't need the declaration
-% \else
-% \chapter*{Acknowledgements}
-% \thispagestyle{empty}
-% \@acknowledgements{}
-% \fi
+
+\newpage
+
+\begin{center}
+    \Large\textbf{Acknowledgements}
+\end{center}
+
+\vspace{1cm}
+
+I would like to express my deepest gratitude to my family for their endless support, encouragement, and patience throughout this journey.
+
+\vspace{0.5cm}
+
+I would like to sincerely thank my professors and academic supervisors for their guidance, valuable advice, and continuous support during the development of this project.
+
+\vspace{0.5cm}
+
+I am grateful to my colleagues and friends for their collaboration, motivation, and the memorable experiences shared throughout my academic years.
+
+\vspace{0.5cm}
+
+I would also like to acknowledge everyone who contributed, directly or indirectly, to the completion of this work and helped me reach this milestone.
+
+\newpage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%

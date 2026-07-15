@@ -101,6 +101,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Thesis meta-information
 %%
+\collegeshield{CollegeShields/floo-logo}
 
 %% The title of the thesis:
 \title{%
@@ -122,9 +123,9 @@ Sondos Said El-Sayed
 }
 
 %% College affiliation:
-\college{Faculty of Engineering - Zagazig University}
+% \college{Faculty of Engineering - Zagazig University}
 
-\collegeshield{CollegeShields/floo-logo}
+
 
 %% Submission date [optional]:
 % \submissiondate{November, 2042}
@@ -159,14 +160,20 @@ and implementing workflow automation.
 
 }
 
+% \renewcommand{\acknowledgements}[1]{%
+% \chapter*{Acknowledgements}
+% \begin{center}
+%     #1
+% \end{center}
+% }
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Acknowledgements:
-%%
-%% \acknowledgements{%
-%%   My acknowledgements ...
-%% }
+%%Acknowledgements:
+
+% \acknowledgements{%
+%   My acknowledgements ...
+% }
 
 
 
@@ -208,7 +215,7 @@ and implementing workflow automation.
 \include{chapters/results-and-testing}
 \include{chapters/future-work}
 
-\marginpar[Margin note.]{Margin par.}
+% \marginpar[Margin note.]{Margin par.}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -218,6 +225,7 @@ and implementing workflow automation.
 \phantomsection
 \addcontentsline{toc}{chapter}{Bibliography}
 \bibliographystyle{plainnat}
+\nocite{*}
 \bibliography{thesis}
 
 

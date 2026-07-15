@@ -135,14 +135,12 @@ The FLOO platform requires a robust, relational data storage layer capable of su
 \subsection{Conceptual Design (ERD)}
 The Conceptual Entity Relationship Diagram (CERD) outlines the high-level business entities and their interactions.
 
-\begin{landscape}
-    \begin{figure}[htbp]
-        \centering
-        \includegraphics[width=0.9\paperheight,height=0.9\paperwidth,keepaspectratio]{images/erd/conceptual-erd.png}
-        \caption{Conceptual Entity Relationship Diagram (CERD) for the FLOO platform}
-        \label{fig:cerd}
-    \end{figure}
-\end{landscape}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{images/erd/conceptual-erd.png}
+    \caption{Conceptual Entity Relationship Diagram (CERD) for the FLOO platform}
+    \label{fig:cerd}
+\end{figure}
 
 \subsubsection{Core Entity Relationships}
 The conceptual model is heavily centered around the \texttt{User} entity, enforcing a strict ownership hierarchy:
@@ -165,15 +163,12 @@ Instead of hardcoding specific integration tokens into a single table, the syste
 \subsection{Mapping to Relational Model (Logical/Physical Design)}
 The logical design translates the conceptual entities into concrete database tables, explicitly defining keys, data types, and constraints utilizing the Prisma schema.
 
-
-\begin{landscape}
-  \begin{figure}[H]
-      \centering
-      \includegraphics[width=0.9\paperheight,height=0.9\paperwidth,keepaspectratio]{images/erd/physical-erd.png}
-      \caption{Physical Entity Relationship Diagram (CERD) for the FLOO platform}
-      \label{fig:perd}
-  \end{figure}
-\end{landscape}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\linewidth,height=0.9\textheight,keepaspectratio]{images/erd/physical-erd.png}
+    \captionof{figure}{Physical Entity Relationship Diagram (CERD) for the FLOO platform}
+    \label{fig:perd}
+\end{figure}
 
 \subsubsection{Primary and Foreign Key Strategy}
 \begin{itemize}
@@ -4307,7 +4302,7 @@ The frontend of the application is a single-page application (SPA) built utilizi
     \caption{Frontend Architecture and Project Structure Image}
 \end{figure}
 
-\subsubsection{Application Entry Point}
+\subsection{Application Entry Point}
 
 \textbf{Purpose:} Acts as the initial script executed upon application start. It bootstraps the application and hands execution control over to the routing system.
 
@@ -4322,7 +4317,7 @@ The frontend of the application is a single-page application (SPA) built utilizi
     \item Encapsulates the entire component tree within global providers and the router to establish application-wide state.
 \end{itemize}
 
-\subsubsection{Root Component}
+\subsection{Root Component}
 
 \textbf{Purpose:} Serves as the top-level shell component of the application that hosts whichever page the user navigates to.
 
@@ -4335,7 +4330,7 @@ The frontend of the application is a single-page application (SPA) built utilizi
     \item Renders the router's \texttt{Outlet}, functioning as the dynamic placeholder where the currently active route's page is displayed.
 \end{itemize}
 
-\subsubsection{Global Providers}
+\subsection{Global Providers}
 
 \textbf{Purpose:} Supplies application-wide state and services across the entire component tree, mitigating the need for manual "prop drilling" through nested layers.
 
@@ -4351,7 +4346,7 @@ The frontend of the application is a single-page application (SPA) built utilizi
     \item \textbf{ReactQueryProvider:} Initializes the data-fetching and caching library context.
 \end{itemize}
 
-\subsubsection{Global State Containers}
+\subsection{Global State Containers}
 
 \textbf{Purpose:} Defines the React Context objects responsible for holding shared application state, acting as the distribution channels filled by providers.
 
@@ -4365,7 +4360,7 @@ The frontend of the application is a single-page application (SPA) built utilizi
     \item Allows any nested component or hook to directly subscribe to and read global values without intermediate propagation.
 \end{itemize}
 
-\subsubsection{Custom Logic Hooks}
+\subsection{Custom Logic Hooks}
 
 \textbf{Purpose:} Abstracts business logic and data-fetching into reusable modules, keeping View components purely presentational and lightweight.
 
@@ -4380,7 +4375,7 @@ The frontend of the application is a single-page application (SPA) built utilizi
     \item Manages request lifecycles, tracking active loading and error states via React Query to return ready-to-use data to the component.
 \end{itemize}
 
-\subsubsection{API Data Layer}
+\subsection{API Data Layer}
 
 \textbf{Purpose:} Centralizes all network communication directly with the backend REST API, guaranteeing the rest of the application never interfaces with network requests directly.
 
@@ -4394,7 +4389,7 @@ The frontend of the application is a single-page application (SPA) built utilizi
     \item Utilizes a shared authenticated-fetch helper to automatically append user tokens and process standard JSON responses.
 \end{itemize}
 
-\subsubsection{End-to-End Execution Path}
+\subsection{End-to-End Execution Path}
 
 \textbf{Purpose:} Maps the sequential runtime lifecycle of a user request traveling from the client down to the backend REST API and back.
 
@@ -4558,9 +4553,9 @@ For example:
 
 This modular architecture improves reliability, simplifies debugging, and allows individual stages to be independently improved without affecting the rest of the system.
 
-\section*{AI Integration}
+\section{AI Models Integration}
 
-\section{Overview}
+\subsection{Overview}
 
 To extend the workflow engine with intelligent image-processing capabilities, an AI integration layer was introduced. The AI team developed multiple computer vision models in Python, including image processing and analysis tasks such as edge detection, optical character recognition (OCR), image classification, and image cropping.
 
@@ -4569,7 +4564,7 @@ Since the workflow engine is implemented in Node.js while the AI models are impl
 To achieve this, the AI models were exposed as RESTful services using \textbf{FastAPI}, allowing the workflow engine to invoke AI functionality through standard HTTP requests.
 
 
-\section{Architecture}
+\subsection{Architecture}
 
 The integration follows a service-oriented architecture where the workflow engine communicates with an independent AI service.
 
@@ -4578,7 +4573,7 @@ The backend is responsible for workflow orchestration, while the FastAPI service
 This separation allows both systems to evolve independently while maintaining a clean interface between them.
 
 
-\section{AI Nodes}
+\subsection{AI Nodes}
 
 Each AI capability is represented as a workflow node.
 
@@ -4609,7 +4604,7 @@ During execution, the node performs the following steps:
 This design enables AI operations to behave exactly like any other workflow node while hiding the implementation details of the underlying models.
 
 
-\section{Metadata-Based Communication}
+\subsection{Metadata-Based Communication}
 
 Rather than sending only the image to the AI service, the backend also sends execution metadata, including:
 
@@ -4625,7 +4620,7 @@ This metadata enables the AI service to correctly associate generated outputs wi
 It also allows generated files to be organized automatically according to the workflow structure without requiring additional backend processing.
 
 
-\section{Optimized Output Handling}
+\subsection{Optimized Output Handling}
 
 One of the architectural decisions made during the AI integration was to avoid transferring processed images back to the backend.
 
@@ -4675,7 +4670,7 @@ This approach provides several advantages:
 \end{itemize}
 
 
-\section{Design Benefits}
+\subsection{Design Benefits}
 
 The adopted architecture provides several software engineering advantages:
 

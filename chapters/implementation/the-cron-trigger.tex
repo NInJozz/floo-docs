@@ -1,7 +1,7 @@
-\subsection{The Cron Trigger}
+\section{The Cron Trigger}
 The \texttt{CronSource} class implements \texttt{EventSource} for time-based, repeating workflow execution. It wraps BullMQ's job scheduler API to create persistent, interval-based jobs that survive application restarts.
 
-\subsubsection{Configuration Parameters}
+\subsection{Configuration Parameters}
 The cron node accepts two parameters defined in its static description:
 \begin{table}[htbp]
 \centering
@@ -34,7 +34,7 @@ if (isNaN(startDate))
   throw new AppError('Invalid start date', 403);
 \end{lstlisting}
 
-\subsubsection{Delay Calculation}
+\subsection{Delay Calculation}
 A cron trigger does not simply fire at interval ms from now. Instead, it respects the configured start date as an anchor point. If the start date is in the past, the system calculates when the next execution should have occurred and schedules from there:
 
 \begin{lstlisting}
@@ -57,7 +57,7 @@ if (now >= startDate) {
 
 This ensures that a cron trigger which was configured to run every 10 minutes starting at 09:00 will, if deployed at 09:47, fire next at 09:50 — not 09:57. The trigger stays aligned with the intended schedule regardless of when the workflow was deployed.
 
-\subsubsection{Scheduling with BullMQ}
+\subsection{Scheduling with BullMQ}
 BullMQ's \texttt{upsertJobScheduler()} is used to register the repeating job:
 
 \begin{lstlisting}
@@ -83,10 +83,10 @@ const job = await this.queue.upsertJobScheduler(
 
 The use of \texttt{upsertJobScheduler} rather than \texttt{add()} is deliberate: it is idempotent. If a scheduler with the same \texttt{jobId} already exists (e.g. after a server restart or a re-deploy), it is updated in place rather than creating a duplicate. The \texttt{jobId} follows the convention \texttt{cron-{projectId}-{nodeId}}, which makes it unique per node per project.
 
-\subsubsection{Stopping the Cron Trigger}
+\subsection{Stopping the Cron Trigger}
 Stopping the cron trigger is straightforward — the scheduler is removed by its identifier in \texttt{stopTriggerNodes} function in \texttt{workflow-runner} module. This permanently removes the repeating schedule from BullMQ's Redis store. Any jobs already in the queue from this scheduler may still execute, but no new ones will be added.
 
 
-\subsubsection{BullMQ over native timers}
+\subsection{BullMQ over native timers}
  
 Using \texttt{setInterval()} or \texttt{setTimeout()} for cron scheduling would not survive a server restart --- all in-flight timers are lost when the process exits. BullMQ persists job schedules in Redis, meaning that if the server crashes and restarts, scheduled jobs resume automatically without any extra recovery logic.

@@ -36,8 +36,7 @@
 % \begin{document}
 
 %====================================================
-\section*{Text Guided Object detection}
-\addcontentsline{toc}{chapter}{Testing and Results}
+\section{Text Guided Object detection}
 \label{chap:testing-results}
 
 The proposed Text-Guided Object Detection model was evaluated using both quantitative performance metrics and qualitative visual inspection. The evaluation aims to verify the model's capability to accurately localize target objects specified by natural language prompts while maintaining stable learning behavior during training.
@@ -46,7 +45,7 @@ The following sections present the training performance, evaluation metrics, dat
 
 %====================================================
 
-\section{Training Performance}
+\subsection{Training Performance}
 
 Figure~\ref{fig:training} presents the overall training process. The training and validation losses decrease steadily throughout the epochs, indicating successful convergence without noticeable overfitting. The evaluation metrics also improve consistently as training progresses.
 
@@ -59,7 +58,7 @@ Figure~\ref{fig:training} presents the overall training process. The training an
 
 %====================================================
 
-\section{Evaluation Curves}
+\subsection{Evaluation Curves}
 
 The performance of the detector was evaluated across various confidence thresholds. Figure~\ref{fig:all_curves} illustrates the comprehensive analysis of Precision, Recall, and F1-score transitions.
 
@@ -100,7 +99,7 @@ The performance of the detector was evaluated across various confidence threshol
 
 %====================================================
 
-\section{Confusion Matrices}
+\subsection{Confusion Matrices}
 
 The confusion matrices summarize the classification performance of the detector. Figure~\ref{fig:confusion_matrices} displays both the raw and normalized values, indicating that the majority of detected objects were correctly classified along the main diagonal.
 
@@ -125,7 +124,7 @@ The confusion matrices summarize the classification performance of the detector.
 
 %====================================================
 
-\section{Dataset Statistics}
+\subsection{Dataset Statistics}
 
 Figure~\ref{fig:labels} summarizes the dataset distribution used during training. The plots illustrate the number of object instances, class distribution, bounding-box sizes, and spatial locations of labeled objects.
 
@@ -138,7 +137,7 @@ Figure~\ref{fig:labels} summarizes the dataset distribution used during training
 
 %====================================================
 
-\section{Qualitative Detection Results}
+\subsection{Qualitative Detection Results}
 
 The proposed Text-Guided Object Detection model receives two inputs: an image and a textual prompt describing the target object. Instead of detecting all objects within the scene, the model identifies only the object corresponding to the given text query and generates its bounding box.
 

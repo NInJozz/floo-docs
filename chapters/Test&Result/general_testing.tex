@@ -1,5 +1,5 @@
 
-\section{Overview}
+\section{General Testing}
 
 Testing was performed throughout the development process to ensure the correctness, reliability, and stability of the workflow engine. Multiple testing levels were applied, ranging from unit testing of individual components to end-to-end validation of complete workflow executions.
 
@@ -15,7 +15,7 @@ The testing strategy included:
 \end{itemize}
 
 
-\section{Unit Testing}
+\subsection{Unit Testing}
 
 Unit testing was performed using \textbf{Jest} to validate the behavior of individual backend components independently from the rest of the system.
 
@@ -45,7 +45,7 @@ Each unit test verifies:
 Automated unit testing allowed rapid detection of regressions whenever new functionality was added.
 
 
-\section{API Testing}
+\subsection{API Testing}
 
 Backend REST APIs were validated using \textbf{Postman}.
 
@@ -63,7 +63,7 @@ Each endpoint was tested under both normal and exceptional conditions to verify:
 API testing ensured that backend services communicate correctly with frontend components and external systems.
 
 
-\section{Integration Testing}
+\subsection{Integration Testing}
 
 Integration testing verified the interaction between multiple backend modules and external services.
 
@@ -82,7 +82,7 @@ The following integrations were validated:
 These tests confirmed that data flows correctly across different services and that each subsystem communicates using the expected interfaces.
 
 
-\section{End-to-End Workflow Testing}
+\subsection{End-to-End Workflow Testing}
 
 Complete workflows were executed to validate the behavior of the system under realistic operating conditions.
 
@@ -102,7 +102,7 @@ Typical execution scenarios included:
 End-to-end testing ensured that the execution engine correctly orchestrates node execution while preserving data flow between workflow nodes.
 
 
-\section{Error Handling Validation}
+\subsection{Error Handling Validation}
 
 Error scenarios were intentionally tested to verify the robustness of the workflow engine.
 
@@ -120,7 +120,7 @@ Examples include:
 The backend was verified to return meaningful error messages while preventing unexpected system failures.
 
 
-\section{Performance Validation}
+\subsection{Performance Validation}
 
 Basic performance validation was performed on the workflow execution process.
 

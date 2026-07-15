@@ -40,15 +40,14 @@
 
 % \begin{document}
 
-\section*{single object image classification}
-\addcontentsline{toc}{chapter}{Testing and Results}
+\section{single object image classification}
 \label{chap:testing-results}
 
 The proposed Single-Object Image Classification model was evaluated using quantitative performance metrics and qualitative testing through a deployed inference API. The evaluation demonstrates both the learning capability of the proposed CNN model during training and its effectiveness in classifying unseen real-world images.
 
 %====================================================
 
-\section{Training Performance}
+\subsection{Training Performance}
 
 The CNN model was trained for 100 epochs using categorical cross-entropy loss. Figure~\ref{fig:training_curves} shows the training and validation accuracy together with the corresponding loss curves. The accuracy increases steadily while both losses decrease, indicating stable convergence without noticeable overfitting.
 
@@ -73,7 +72,7 @@ The CNN model was trained for 100 epochs using categorical cross-entropy loss. F
 
 %====================================================
 
-\section{Confusion Matrix}
+\subsection{Confusion Matrix}
 
 The confusion matrix provides a detailed evaluation of the classification performance for every object class. Most predictions appear along the main diagonal, indicating that the proposed model correctly classified the majority of testing samples with only a limited number of misclassified images.
 
@@ -86,7 +85,7 @@ The confusion matrix provides a detailed evaluation of the classification perfor
 
 %====================================================
 
-\section{Single-Object Image Classification}
+\subsection{Single-Object Image Classification}
 
 To validate the deployment stage, the trained model was integrated into a REST API hosted on Hugging Face Spaces. The API receives an input image and returns the predicted object category together with its confidence score in JSON format. This experiment verifies that the deployed model performs consistently on unseen real-world images captured outside the training dataset.
 
